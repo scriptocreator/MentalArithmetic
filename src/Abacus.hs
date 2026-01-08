@@ -4,8 +4,10 @@ module Abacus where
 
 import TypeAbacus
 import ImperativeAbacus
+import System.Random.Stateful
 
 infixr 6 --!
+
 
 
 instance Eq RowAbacus where
@@ -13,7 +15,7 @@ instance Eq RowAbacus where
         | (leftLower == rightLower) && (leftUpper == rightUpper) = True
         | otherwise = False
 
-    leftRow /= rightRow = not $ leftRow == rightRow 
+    leftRow /= rightRow = not $ leftRow == rightRow
 
 instance Ord RowAbacus where
     RowAbacus leftLower True > RowAbacus rightLower False = True
@@ -48,13 +50,13 @@ instance Num [RowAbacus] where
     [] - right = error "Error №1: Вычитать больший абакус нельзя"
 
     (RowAbacus leftLower leftUpper:ls) - (RowAbacus rightLower rightUpper:rs)
-        | (not leftUpper) && rightUpper =
+        | not leftUpper && rightUpper =
             let newrs = balanceRow rs
             in if negLower < 0
                 then RowAbacus balanceBone True : ls - newrs
                 else RowAbacus balanceNegBone False : ls - newrs
 
-        | (not (leftUpper || rightUpper)) || (leftUpper && rightUpper) = if negLower < 0
+        | not (leftUpper || rightUpper) || (leftUpper && rightUpper) = if negLower < 0
             then let newrs = balanceRow rs
                 in RowAbacus balanceNegBone True : ls - newrs
             else RowAbacus balanceBone False : ls - rs
@@ -68,7 +70,7 @@ instance Num [RowAbacus] where
         where numLeftLower = length leftLower
               numRightLower = length rightLower
               negLower = numLeftLower - numRightLower
-              balanceNegBone = take (5 - abs negLower) $ repeat Done
+              balanceNegBone = replicate (5 - abs negLower) Done
               balanceBone = leftLower --! rightLower
 
 
@@ -85,29 +87,50 @@ a --! [] = a
 (Done:fis) --! (Done:sis) = fis --! sis
 
 
-curMerelyAbacus :: Abacus -> [App] -> [Abacus]
-curMerelyAbacus abacus [] = [abacus]
-curMerelyAbacus abacus (App logApp f:fs) = curAbacus : curMerelyAbacus futureAbacus fs
+curMerelyAbacus :: StdGen -> [RowAbacus] -> [App] -> ([Abacus], StdGen)
+curMerelyAbacus gen abacus [] = ([Abacus abacus], gen)
+curMerelyAbacus gen abacus (App logApp f:fs)
+    = let (futureAbacusis, futureGen) = curMerelyAbacus newGen newStandAbacus fs
+        in (operApp : Abacus curAbacus : futureAbacusis, futureGen)
 
-    where curAbacus = fmap powerInAbacus $ fmap f abacus -- Создание текущего аргумента, по диапазонам и теме
-          randomApp = if logApp then (+) else (-)
-          futureAbacus = abacus `randomApp` curAbacus -- Применение операции на аргументах
+    where newAbacusAndGen :: StdGen -> [RowAbacus] -> ([RowAbacus], StdGen) -- Создание текущего аргумента, по диапазонам и теме
+          newAbacusAndGen gen [] = ([], gen)
+          newAbacusAndGen gen (row:as) = let (curRow, firstGen) = powerInAbacus gen $ f row
+                                             (futureRows, secondGen) = newAbacusAndGen firstGen as
+            in (curRow : futureRows, secondGen)
+          (curAbacus, newGen) = newAbacusAndGen gen abacus
+          (randomApp, operApp) = if logApp then ((+), Plus) else ((-), Minus)
+          newStandAbacus = abacus `randomApp` curAbacus -- Применение операции на аргументах
 
-curBrotherAbacus :: Abacus -> [AppBro] -> [Abacus]
-curBrotherAbacus abacus [] = [abacus]
-curBrotherAbacus abacus (AppBro logApp logPlus f:fs) = curAbacus : curBrotherAbacus futureAbacus fs
+curBrotherAbacus :: StdGen -> [RowAbacus] -> [AppBro] -> ([Abacus], StdGen)
+curBrotherAbacus gen abacus [] = ([Abacus abacus], gen)
+curBrotherAbacus gen abacus (AppBro logApp logPlus f:fs)
+    = let (futureAbacusis, futureGen) = curBrotherAbacus newGen newStandAbacus fs
+        in (operApp : Abacus curAbacus : futureAbacusis, futureGen)
 
-    where curAbacus = fmap powerInAbacus $ fmap (f logPlus) abacus
-          randomApp = if logApp then (+) else (-)
-          futureAbacus = abacus `randomApp` curAbacus
+    where newAbacusAndGen :: StdGen -> [RowAbacus] -> ([RowAbacus], StdGen) -- Создание текущего аргумента, по диапазонам и теме
+          newAbacusAndGen gen [] = ([], gen)
+          newAbacusAndGen gen (row:as) = let (curRow, firstGen) = powerInAbacus gen $ f logPlus row
+                                             (futureRows, secondGen) = newAbacusAndGen firstGen as
+            in (curRow : futureRows, secondGen)
+          (curAbacus, newGen) = newAbacusAndGen gen abacus
+          (randomApp, operApp) = if logApp then ((+), Plus) else ((-), Minus)
+          newStandAbacus = abacus `randomApp` curAbacus
 
-curFriendAbacus :: Abacus -> [App] -> [Abacus]
-curFriendAbacus abacus [] = [abacus]
-curFriendAbacus abacus (App logApp f:fs) = curAbacus : curFriendAbacus futureAbacus fs
+curFriendAbacus :: StdGen -> [RowAbacus] -> [App] -> ([Abacus], StdGen)
+curFriendAbacus gen abacus [] = ([Abacus abacus], gen)
+curFriendAbacus gen abacus (App logApp f:fs)
+    = let (futureAbacusis, futureGen) = curFriendAbacus newGen newStandAbacus fs
+        in (operApp : Abacus curAbacus : futureAbacusis, futureGen)
 
-    where curAbacus = fmap powerInAbacus $ fmap f abacus
-          randomApp = if logApp then (+) else (-)
-          futureAbacus = abacus `randomApp` curAbacus
+    where newAbacusAndGen :: StdGen -> [RowAbacus] -> ([RowAbacus], StdGen) -- Создание текущего аргумента, по диапазонам и теме
+          newAbacusAndGen gen [] = ([], gen)
+          newAbacusAndGen gen (row:as) = let (curRow, firstGen) = powerInAbacus gen $ f row
+                                             (futureRows, secondGen) = newAbacusAndGen firstGen as
+            in (curRow : futureRows, secondGen)
+          (curAbacus, newGen) = newAbacusAndGen gen abacus
+          (randomApp, operApp) = if logApp then ((+), Plus) else ((-), Minus)
+          newStandAbacus = abacus `randomApp` curAbacus
 
 
 newMerelyAbacusPlus :: RowAbacus -> (Int, Int)
@@ -136,7 +159,7 @@ newMerelyAbacusMinus (RowAbacus lower upper)
     where powerLower = length lower
 
 newBrotherAbacusMinus :: Bool -> RowAbacus -> (Int, Int)
-newBrotherAbacusMinus _ (RowAbacus lower upper)
+newBrotherAbacusMinus log (RowAbacus lower upper)
     | upper = (powerLower, 1)
     | otherwise = (powerLower, 0)
     where powerLower = 4 - length lower
