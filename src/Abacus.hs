@@ -3,19 +3,14 @@
 module Abacus where
 
 import TypeAbacus
+import PureFunctions
+import LazyFunctions
 import ImperativeAbacus
 import System.Random.Stateful
 
 infixr 6 --!
 
 
-
-instance Eq RowAbacus where
-    RowAbacus leftLower leftUpper == RowAbacus rightLower rightUpper
-        | (leftLower == rightLower) && (leftUpper == rightUpper) = True
-        | otherwise = False
-
-    leftRow /= rightRow = not $ leftRow == rightRow
 
 instance Ord RowAbacus where
     RowAbacus leftLower True > RowAbacus rightLower False = True
@@ -87,50 +82,52 @@ a --! [] = a
 (Done:fis) --! (Done:sis) = fis --! sis
 
 
-curMerelyAbacus :: StdGen -> [RowAbacus] -> [App] -> ([Abacus], StdGen)
+curMerelyAbacus :: StdGen -> [RowAbacus] -> [Expr] -> ([Abacus], StdGen)
 curMerelyAbacus gen abacus [] = ([Abacus abacus], gen)
-curMerelyAbacus gen abacus (App logApp f:fs)
+curMerelyAbacus gen abacus (expr:fs)
     = let (futureAbacusis, futureGen) = curMerelyAbacus newGen newStandAbacus fs
-        in (operApp : Abacus curAbacus : futureAbacusis, futureGen)
+        in (operExpr : Abacus curAbacus : futureAbacusis, futureGen)
 
-    where newAbacusAndGen :: StdGen -> [RowAbacus] -> ([RowAbacus], StdGen) -- Создание текущего аргумента, по диапазонам и теме
-          newAbacusAndGen gen [] = ([], gen)
-          newAbacusAndGen gen (row:as) = let (curRow, firstGen) = powerInAbacus gen $ f row
-                                             (futureRows, secondGen) = newAbacusAndGen firstGen as
-            in (curRow : futureRows, secondGen)
-          (curAbacus, newGen) = newAbacusAndGen gen abacus
-          (randomApp, operApp) = if logApp then ((+), Plus) else ((-), Minus)
-          newStandAbacus = abacus `randomApp` curAbacus -- Применение операции на аргументах
+    where logExpr = operator expr
+          (curAbacus, newGen) = newAbacusAndGen gen f abacus
+          (randomExpr, f, operExpr) = if logExpr
+            then ((+), newMerelyAbacusPlus, Plus)
+            else ((-), newMerelyAbacusMinus, Minus)
+          newStandAbacus = abacus `randomExpr` curAbacus -- Применение операции на аргументах
 
-curBrotherAbacus :: StdGen -> [RowAbacus] -> [AppBro] -> ([Abacus], StdGen)
+curBrotherAbacus :: StdGen -> [RowAbacus] -> [Expr] -> ([Abacus], StdGen)
 curBrotherAbacus gen abacus [] = ([Abacus abacus], gen)
-curBrotherAbacus gen abacus (AppBro logApp logPlus f:fs)
+curBrotherAbacus gen abacus (expr:fs)
     = let (futureAbacusis, futureGen) = curBrotherAbacus newGen newStandAbacus fs
-        in (operApp : Abacus curAbacus : futureAbacusis, futureGen)
+        in (operExpr : Abacus curAbacus : futureAbacusis, futureGen)
 
-    where newAbacusAndGen :: StdGen -> [RowAbacus] -> ([RowAbacus], StdGen) -- Создание текущего аргумента, по диапазонам и теме
-          newAbacusAndGen gen [] = ([], gen)
-          newAbacusAndGen gen (row:as) = let (curRow, firstGen) = powerInAbacus gen $ f logPlus row
-                                             (futureRows, secondGen) = newAbacusAndGen firstGen as
-            in (curRow : futureRows, secondGen)
-          (curAbacus, newGen) = newAbacusAndGen gen abacus
-          (randomApp, operApp) = if logApp then ((+), Plus) else ((-), Minus)
-          newStandAbacus = abacus `randomApp` curAbacus
+    where (logExpr, logPlus) = (operator expr, ifPlus expr)
+          (curAbacus, newGen) = newAbacusAndGen gen (f logPlus) abacus
+          (randomExpr, f, operExpr) = if logExpr
+            then ((+), newBrotherAbacusPlus, Plus)
+            else ((-), newBrotherAbacusMinus, Minus)
+          newStandAbacus = abacus `randomExpr` curAbacus
 
-curFriendAbacus :: StdGen -> [RowAbacus] -> [App] -> ([Abacus], StdGen)
+curFriendAbacus :: StdGen -> [RowAbacus] -> [Expr] -> ([Abacus], StdGen)
 curFriendAbacus gen abacus [] = ([Abacus abacus], gen)
-curFriendAbacus gen abacus (App logApp f:fs)
+curFriendAbacus gen abacus (expr:fs)
     = let (futureAbacusis, futureGen) = curFriendAbacus newGen newStandAbacus fs
-        in (operApp : Abacus curAbacus : futureAbacusis, futureGen)
+        in (operExpr : Abacus curAbacus : futureAbacusis, futureGen)
 
-    where newAbacusAndGen :: StdGen -> [RowAbacus] -> ([RowAbacus], StdGen) -- Создание текущего аргумента, по диапазонам и теме
-          newAbacusAndGen gen [] = ([], gen)
-          newAbacusAndGen gen (row:as) = let (curRow, firstGen) = powerInAbacus gen $ f row
-                                             (futureRows, secondGen) = newAbacusAndGen firstGen as
-            in (curRow : futureRows, secondGen)
-          (curAbacus, newGen) = newAbacusAndGen gen abacus
-          (randomApp, operApp) = if logApp then ((+), Plus) else ((-), Minus)
-          newStandAbacus = abacus `randomApp` curAbacus
+    where logExpr = operator expr
+          (curAbacus, newGen) = newAbacusAndGen gen f abacus
+          (randomExpr, f, operExpr) = if logExpr
+            then ((+), newFriendAbacusPlus, Plus)
+            else ((-), newFriendAbacusMinus, Minus)
+          newStandAbacus = abacus `randomExpr` curAbacus
+
+
+newAbacusAndGen :: StdGen -> (RowAbacus -> (Int, Int)) -> [RowAbacus] -> ([RowAbacus], StdGen) -- Создание текущего аргумента, по диапазонам и теме
+newAbacusAndGen gen _ [] = ([], gen)
+newAbacusAndGen gen f (row:as) =
+    let (curRow, firstGen) = powerInAbacus gen $ f row
+        (futureRows, secondGen) = newAbacusAndGen firstGen f as
+    in (curRow : futureRows, secondGen)
 
 
 newMerelyAbacusPlus :: RowAbacus -> (Int, Int)
@@ -167,3 +164,6 @@ newBrotherAbacusMinus log (RowAbacus lower upper)
 -- Потом допишу «Друг + Брат»
 newFriendAbacusMinus :: RowAbacus -> (Int, Int)
 newFriendAbacusMinus (RowAbacus lower upper) = (4, 1)
+
+newAbacus :: (Int, Int)
+newAbacus = (4,1)

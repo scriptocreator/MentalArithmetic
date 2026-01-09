@@ -27,6 +27,8 @@ library
   exposed-modules:
       Abacus
       ImperativeAbacus
+      LazyFunctions
+      PureFunctions
       TypeAbacus
   other-modules:
       Paths_MentalArithmetic

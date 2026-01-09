@@ -1,37 +1,27 @@
-{-# LANGUAGE DuplicateRecordFields, StrictData #-}
+{-# LANGUAGE FlexibleInstances, DuplicateRecordFields, StrictData #-}
 
 module TypeAbacus where
 
 
 
-type Expression = [[Abacus]]
-
 data Abacus
     = Abacus [RowAbacus]
     | Plus
     | Minus
-    deriving Show
+    deriving (Show, Eq)
 
 data RowAbacus = RowAbacus [Done] Bool deriving Show
 
 data Done = Done deriving (Show, Eq, Ord)
 
+instance Eq RowAbacus where
+    RowAbacus leftLower leftUpper == RowAbacus rightLower rightUpper
+        | (leftLower == rightLower) && (leftUpper == rightUpper) = True
+        | otherwise = False
 
-data App = App
-    {operator :: Bool
-    , function :: RowAbacus -> (Int, Int)}
-
-data AppBro = AppBro
-    {operator :: Bool
-    , ifPlus :: Bool
-    , function :: Bool -> RowAbacus -> (Int, Int)}
+    leftRow /= rightRow = not $ leftRow == rightRow
 
 
-type Carriage = Int
-
-
-data Theme = Merely | Brother | Friend deriving (Show, Eq, Ord)
-
-type StartLine = Int
-type LengthExpr = Int
-type RangeRows = (Int, Int)
+data Expr
+    = Expr {operator :: Bool}
+    | ExprBro {operator :: Bool, ifPlus :: Bool} -- Оператор; Для условия функции
