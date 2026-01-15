@@ -30,6 +30,7 @@ library
       LazyFunctions
       PureFunctions
       TypeAbacus
+      TypeImperativeAbacus
   other-modules:
       Paths_MentalArithmetic
   autogen-modules:

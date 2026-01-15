@@ -42,7 +42,7 @@ instance Num [RowAbacus] where
 
     [] - [] = []
     left - [] = left
-    [] - right = error "Error №1: Вычитать больший абакус нельзя"
+    [] - right = error "Error Abacus №1: Вычитать больший абакус нельзя"
 
     (RowAbacus leftLower leftUpper:ls) - (RowAbacus rightLower rightUpper:rs)
         | not leftUpper && rightUpper =
@@ -69,7 +69,7 @@ instance Num [RowAbacus] where
               balanceBone = leftLower --! rightLower
 
 
-balanceRow [] = error "Error №2: У абакуса обнаружены пустые разряды"
+balanceRow [] = error "Error Abacus №2: У абакуса обнаружены пустые разряды"
 balanceRow (RowAbacus (_:lowers) upper:rows) = RowAbacus lowers upper : rows
 balanceRow (RowAbacus [] True:rows) = RowAbacus [Done, Done, Done, Done] False : rows
 balanceRow (_:rows) = RowAbacus [Done, Done, Done, Done] True : balanceRow rows

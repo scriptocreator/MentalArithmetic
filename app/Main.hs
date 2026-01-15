@@ -2,6 +2,7 @@ module Main (main) where
 
 import Abacus
 import TypeAbacus
+import TypeImperativeAbacus
 import PureFunctions
 import LazyFunctions
 import ImperativeAbacus
@@ -9,17 +10,19 @@ import ImperativeAbacus
 import System.Random
 import Graphics.Gloss
 import Graphics.Gloss.Interface.Pure.Game
-import Data.Maybe (fromJust, isJust)
+import Data.Maybe (fromJust, isJust, catMaybes)
 import Data.List (find)
-import ImperativeAbacus (Expressions(Expressions))
 
 
+
+horiz = 1920 :: Int
+vert = 1040 :: Int
 
 halfHoriz :: Int
-halfHoriz = 1920 `div` 2
+halfHoriz = horiz `div` 2
 
 halfVert :: Int
-halfVert = 1040 `div` 2
+halfVert = vert `div` 2
 
 initWord :: StdGen -> World
 initWord gen = EditSettings [EditStartLine (Right $ StartLine (-halfHoriz))] :\^/ EditApp [EditRandom gen]
@@ -47,24 +50,26 @@ outputAbacusis (current, predPictures) (str:ss)
 
 handleKey :: Event -> World -> World
 handleKey (EventKey (SpecialKey KeyCtrlL) Down _ _) (world@(EditApp {}) :\^/ set@(EditSettings {}))
-    = error "В состоянии редактирования, невозможно переключиться на приложение"
+    = error "В состоянии редактирования, невозможно переключиться на редактирование приложения"
 
-handleKey (EventKey (SpecialKey KeyCtrlL) Down _ _) world@(EditSettings listMSet :\^/ EditApp listMApp)
-    | isJust mlistSet && isJust mlistApp
+
+handleKey (EventKey (SpecialKey KeyCtrlL) Down _ _) world@(EditSettings listEffSet :\^/ EditApp listEffApp)
+    | isJust mListSet && isJust mListApp && all isJust listMSet
         = App (Expressions finalExpr) finalGen carr :\^/ Settings start lenExpr quant theme range
     | otherwise = world
-    
-    where mlistSet = sortEditSet listMSet
-          mlistApp = sortEditApp listMApp
-          [EditStartLine (Right start), EditLengthExpr (Right lenExpr), EditQuantityQuestion (Right quant), EditTheme (Right theme), EditRangeRows (Right range)] =
-            fmap typeToSet $ fromJust mlistSet
-          [EditExpressions expr, EditRandom rand, EditCarriage carr] = fromJust mlistApp
+
+    where mListSet = sortEditSet listEffSet
+          mListApp = sortEditApp listEffApp
+          listMSet = fmap typeToSet $ fromJust mListSet
+          listSet = catMaybes listMSet
+          [EditStartLine (Right start), EditLengthExpr (Right lenExpr), EditQuantityQuestion (Right quant), EditTheme (Right theme), EditRangeRows _ _ (Right range)] = listSet
+          [EditExpressions expr, EditRandom rand, EditCarriage carr] = fromJust mListApp
 
           LengthExpr pureLenExpr = lenExpr
           QuantityQuestion pureQuant = quant
 
           (abac, rep) = case theme of
-            Merely -> (curMerelyAbacus, repeatExpr) 
+            Merely -> (curMerelyAbacus, repeatExpr)
             Brother -> (curBrotherAbacus, repeatExprBro)
             Friend -> (curFriendAbacus, repeatExpr)
 
@@ -88,31 +93,80 @@ handleKey (EventKey (SpecialKey KeyCtrlL) Down _ _) (App expr rand carr :\^/ Set
     = EditSettings editListSet :\^/ EditApp editListApp
 
     where editListApp = [EditExpressions expr, EditRandom rand, EditCarriage carr]
-          editListSet = [EditStartLine (Right start), EditLengthExpr (Right lenExpr), EditQuantityQuestion (Right quant), EditTheme (Right theme), EditRangeRows (Right range)]
+          editListSet = [EditStartLine (Right start)
+                        ,EditLengthExpr (Right lenExpr)
+                        ,EditQuantityQuestion (Right quant)
+                        ,EditTheme (Right theme)
+                        ,EditRangeRows False Horizontal (Right range)]
 
-handleKey (EventKey (SpecialKey KeyUp) Down _ _) world@(EditSettings listMSet :\^/ app)
-    | not (null listMSet) && (futureSet /= EditSetVoid) = if isJust mFindSet
-        then EditSettings (findSet : freeListMSet) :\^/ app
-        else EditSettings (futureSet : listMSet) :\^/ app
-    | otherwise = world
 
-    where futureSet = toEnum $ pred $ fromEnum $ head listMSet
-          mFindSet = find (mathElemEditSet futureSet) listMSet
-          findSet = fromJust mFindSet
-          freeListMSet = delElem (mathElemEditSet futureSet) listMSet
+handleKey (EventKey (SpecialKey KeyLeft) Down _ _) world@(EditSettings listEffSet :\^/ app) = multiDirect KeyLeft world
+handleKey (EventKey (SpecialKey KeyRight) Down _ _) world@(EditSettings listEffSet :\^/ app) = multiDirect KeyRight world
+handleKey (EventKey (SpecialKey KeyUp) Down _ _) world@(EditSettings listEffSet :\^/ app) = multiDirect KeyUp world
+handleKey (EventKey (SpecialKey KeyDown) Down _ _) world@(EditSettings listEffSet :\^/ app) = multiDirect KeyDown world
 
-handleKey (EventKey (SpecialKey KeyDown) Down _ _) world@(EditSettings listMSet :\^/ app)
-    | not (null listMSet) && (futureSet /= EditSetVoid) = if isJust mFindSet
-        then EditSettings (findSet : freeListMSet) :\^/ app
-        else EditSettings (futureSet : listMSet) :\^/ app
-    | otherwise = world
-
-    where futureSet = toEnum $ succ $ fromEnum $ head listMSet
-          mFindSet = find (mathElemEditSet futureSet) listMSet
-          findSet = fromJust mFindSet
-          freeListMSet = delElem (mathElemEditSet futureSet) listMSet
 
 handleKey _ world = world
+
+
+multiDirect :: SpecialKey -> World -> World
+multiDirect key world@(EditSettings listEffSet :\^/ app)
+    | isThirdJust thNestedSet
+        = EditSettings (pureNestedSet : tailListEffSet) :\^/ app
+    | (futureSet /= EditSetVoid) = if isJust mFindSet
+        then EditSettings (findSet : freeListMSet) :\^/ app
+        else EditSettings (futureSet : listEffSet) :\^/ app
+    | otherwise = world
+
+    where funcDir = if key `elem` [KeyLeft, KeyUp] then pred else succ
+          (headListEffSet:tailListEffSet) = listEffSet
+          thNestedSet = nestedSet headListEffSet key funcDir
+          pureNestedSet = if isThirdRight thNestedSet
+            then fromThirdRight thNestedSet
+            else fromThirdLeft thNestedSet
+
+          futureSet = toEnum $ pred $ fromEnum headListEffSet
+          mFindSet = find (mathElemEditSet futureSet) listEffSet
+          findSet = fromJust mFindSet
+          freeListMSet = delElem (mathElemEditSet futureSet) listEffSet
+
+
+nestedSet :: EditSet -> SpecialKey -> (Int -> Int) -> Third EditSet EditSet
+nestedSet headListEffSet key funcDir
+    | not $ mathDirKey dir key = ThirdLeft $ headListEffSet {nested = False}
+    | fromEnumArgs headListEffSet > 1 && nested headListEffSet && isJust mNewType
+        = ThirdRight $ newHead {edit = Left newType}
+    | otherwise = ThirdNothing
+
+    where dir = direct headListEffSet
+          newHead = if isRightInSet headListEffSet
+            then setToType headListEffSet
+            else headListEffSet
+          enumHead = enumArgsSet $ initRightSet headListEffSet
+          mNewType = nestedType (fromLeft $ edit newHead) enumHead funcDir
+          newType = fromJust mNewType
+
+
+nestedType :: TypeTag -> Int -> (Int -> Int) -> Maybe TypeTag
+nestedType lTypeTags enumSet dir
+    | futureNested >= 0 && futureNested <= enumSet
+        = if isJust mFindType
+            then return newListFindTypes
+            else return newListCreateTypes
+    | otherwise = Nothing
+
+    where TypeInt nestedOfType = headType $ headType lTypeTags
+          futureNested = dir nestedOfType
+          mFindType = findType mathType lTypeTags
+          pureFindType = fromJust mFindType
+          freeListTypes = delElemType mathType lTypeTags
+          newListFindTypes = pureFindType +#+ freeListTypes
+
+          newType = TypeComp $ TypeInt futureNested :#+ TypeVoid
+          newListCreateTypes = newType +#+ lTypeTags
+
+          mathType a | headType a == (TypeInt futureNested) = True
+          mathType _ = False
 
 
 update _ world = world
@@ -121,7 +175,7 @@ update _ world = world
 main :: IO ()
 main = do
     gen <- newStdGen
-    play (InWindow "Random Abacus" (1920, 1040) (0, 0))
+    play (InWindow "Random Abacus" (horiz, vert) (0, 0))
          white
          30
          (initWord gen)
