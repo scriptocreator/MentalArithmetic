@@ -28,11 +28,11 @@ data EditApp
 
 data EditSet
     = EditSetVoid
-    | EditStartLine (Either TypeTag StartLine)
-    | EditLengthExpr (Either TypeTag LengthExpr)
-    | EditQuantityQuestion (Either TypeTag QuantityQuestion)
-    | EditTheme (Either TypeTag Theme)
-    | EditRangeRows {nested :: Bool, direct :: Direct, edit :: (Either TypeTag RangeRows)}
+    | EditStartLine {editStart :: Either TypeTag StartLine}
+    | EditLengthExpr {editExpr :: Either TypeTag LengthExpr}
+    | EditQuantityQuestion {editQuest :: Either TypeTag QuantityQuestion}
+    | EditTheme {editTheme :: Either TypeTag Theme}
+    | EditRangeRows {nested :: Bool, direct :: Direct, editRange :: Either TypeTag RangeRows}
     deriving (Show, Eq)
 
 newtype Expressions = Expressions [[Abacus]] deriving (Show, Eq)

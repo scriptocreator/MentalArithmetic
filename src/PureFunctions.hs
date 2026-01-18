@@ -5,13 +5,12 @@ module PureFunctions where
 import TypeAbacus
 import Text.Printf (printf)
 import Data.List (find)
+import Data.Maybe
 
 
-fromRight :: Either a b -> b
-fromRight (Right r) = r
 
-fromLeft :: Either a b -> a
-fromLeft (Left l) = l
+funcIf :: Bool -> n -> n -> n
+funcIf log a b = if log then a else b
 
 
 delElem :: (a -> Bool) -> [a] -> [a]
@@ -42,13 +41,15 @@ sortTypeList = nestedSort []
 setTypeList :: TypeTag -> [TypeTag] -> [TypeTag]
 setTypeList t [] = [t]
 setTypeList t (tel:ls)
-    | headType t == headType tel
-        = error $ printf "Error PureFunctions №1: Обнаружена ещё одна переменная под аргумент конструктора – «%s» и «%s»" (show arg1) (show arg2)
-    | headType t < headType tel = t : tel : ls
+    | left t == left tel
+        = error $ printf "Error PureFunctions №1: Обнаружена ещё одна переменная под аргумент конструктора – «%s» и «%s»"
+                         (show arg1)
+                         (show arg2)
+    | left t < left tel = t : tel : ls
     | otherwise = tel : setTypeList t ls
 
-    where arg1 = headType $ tailType t
-          arg2 = headType $ tailType tel 
+    where arg1 = right t
+          arg2 = right tel 
 
 
 prodTypeToList :: TypeTag -> [[TypeTag]]
@@ -78,8 +79,8 @@ el +#+! t = el :#* t
 
 
 insertHeadType :: TypeTag -> TypeTag -> TypeTag
-insertHeadType el (TypeNot n) = insertHeadType el n
-insertHeadType el (TypeComp c) = insertHeadType el c
+insertHeadType el (TypeNot n) = TypeNot $ insertHeadType el n
+insertHeadType el (TypeComp c) = TypeComp $ insertHeadType el c
 insertHeadType el (TypeList l) = TypeList (el:l)
 insertHeadType el p@(_ :#* _) = el :#* p
 insertHeadType el s@(_ :#+ _) = el :#+ s
@@ -132,3 +133,77 @@ delElemType f (el :#+ ts)
 delElemType f el
     | f el = TypeVoid
     | otherwise = el
+
+deepLengthType :: TypeTag -> Int
+deepLengthType = nestedLength
+    
+    where nestedLength len@(_:#*_) = operLength 0 len
+          nestedLength len@(_:#+_) = operLength 0 len
+          nestedLength len = constLength len
+          
+          constLength (TypeNot n) = nestedLength n
+          constLength (TypeComp c) = nestedLength c
+          constLength (TypeList l) = length l
+          constLength _ = 1
+
+          operLength num (_ :#* t) = operLength (succ num) t
+          operLength num (_ :#+ t) = operLength (succ num) t
+          operLength num _ = succ num
+
+lengthType :: TypeTag -> Int
+lengthType = nestedLength
+    
+    where nestedLength len@(_:#*_) = operLength 0 len
+          nestedLength len@(_:#+_) = operLength 0 len
+          nestedLength len = 1
+          
+          operLength num (_ :#* t) = operLength (succ num) t
+          operLength num (_ :#+ t) = operLength (succ num) t
+          operLength num _ = succ num
+
+substType :: TypeTag -> (TypeTag -> Bool) -> TypeTag -> TypeTag
+substType el log (x :#* xs)
+    | log x = el :#* xs
+    | otherwise = x :#* substType el log xs
+
+substType el log (x :#+ xs)
+    | log x = el :#+ xs
+    | otherwise = x :#+ substType el log xs
+
+substType el log x
+    | log x = el
+    | otherwise = x
+
+
+isTypeList (TypeList {}) = True
+isTypeList _ = False
+
+isTypeBool (TypeBool {}) = True
+isTypeBool _ = False
+
+
+subst :: a -> (a -> Bool) -> [a] -> [a]
+subst _ _ [] = []
+subst el log (x:xs) | log x = el : xs
+subst el log (x:xs) = x : subst el log xs
+
+
+move :: Bool -> (a -> Bool) -> [a] -> [a]
+move direct logElem l = snd $ nestedMove Nothing l
+
+    where nestedMove (Just oldX) [] = (Nothing, [oldX])
+          nestedMove _ [] = (Nothing, [])
+          nestedMove (Just oldX) (x:xs) = (Nothing, x : oldX : xs)
+          nestedMove _ (x:xs)
+            | logElem x =
+                let (_, futureXS) = nestedMove (Just x) xs 
+                in if direct
+                    then (Nothing, futureXS)
+                    else (Just x, xs)
+            | otherwise =
+                let (mFutureX, futureXS) = nestedMove Nothing xs
+                    futureX = fromJust mFutureX
+                in if isJust mFutureX
+                    then (Nothing, futureX : x : futureXS)
+                    else (Nothing, x : xs)
+ 

@@ -74,8 +74,6 @@ balanceRow (RowAbacus (_:lowers) upper:rows) = RowAbacus lowers upper : rows
 balanceRow (RowAbacus [] True:rows) = RowAbacus [Done, Done, Done, Done] False : rows
 balanceRow (_:rows) = RowAbacus [Done, Done, Done, Done] True : balanceRow rows
 
-funcIf log a b = if log then a else b
-
 (--!) :: [Done] -> [Done] -> [Done]
 [] --! _ = []
 a --! [] = a

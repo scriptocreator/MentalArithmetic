@@ -10,8 +10,10 @@ import ImperativeAbacus
 import System.Random
 import Graphics.Gloss
 import Graphics.Gloss.Interface.Pure.Game
-import Data.Maybe (fromJust, isJust, catMaybes)
+import Data.Maybe (fromJust, isJust, isNothing, catMaybes)
 import Data.List (find)
+import Data.Either (fromLeft)
+import PureFunctions (lengthType)
 
 
 
@@ -24,8 +26,8 @@ halfHoriz = horiz `div` 2
 halfVert :: Int
 halfVert = vert `div` 2
 
-initWord :: StdGen -> World
-initWord gen = EditSettings [EditStartLine (Right $ StartLine (-halfHoriz))] :\^/ EditApp [EditRandom gen]
+initWorld :: StdGen -> World
+initWorld gen = EditSettings [EditStartLine (Right $ StartLine (-halfHoriz))] :\^/ EditApp [EditRandom gen]
 
 
 picture :: World -> Picture
@@ -100,72 +102,157 @@ handleKey (EventKey (SpecialKey KeyCtrlL) Down _ _) (App expr rand carr :\^/ Set
                         ,EditRangeRows False Horizontal (Right range)]
 
 
-handleKey (EventKey (SpecialKey KeyLeft) Down _ _) world@(EditSettings listEffSet :\^/ app) = multiDirect KeyLeft world
-handleKey (EventKey (SpecialKey KeyRight) Down _ _) world@(EditSettings listEffSet :\^/ app) = multiDirect KeyRight world
-handleKey (EventKey (SpecialKey KeyUp) Down _ _) world@(EditSettings listEffSet :\^/ app) = multiDirect KeyUp world
-handleKey (EventKey (SpecialKey KeyDown) Down _ _) world@(EditSettings listEffSet :\^/ app) = multiDirect KeyDown world
+handleKey (EventKey (SpecialKey specKey) Down _ _) world@(EditSettings _ :\^/ _)
+    | specKey `elem` [KeyLeft, KeyRight, KeyUp, KeyDown] = multiDirect specKey world
+    | otherwise = world
+
+
+handleKey (EventKey (Char key) Down _ _) world@(EditSettings _ :\^/ _)
+    | key `elem` ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'] = inputData numType world
+    | otherwise = world
+
+    where numType = figureCharToType key
 
 
 handleKey _ world = world
 
 
+inputData numType world@(EditSettings listEffSet :\^/ app)
+    | isJust mNewHeadSet = EditSettings (newHeadSet : tail listEffSet) :\^/ app
+    | otherwise = world
+
+    where headSet = head listEffSet
+          mNewHeadSet = nestedPutSet headSet numType
+          newHeadSet = fromJust mNewHeadSet
+
+
+nestedPutSet :: EditSet -> TypeTag -> Maybe EditSet
+nestedPutSet headListEffSet putNum
+    | fromEnumArgs headListEffSet == 1 = return newOneArgSet
+    | fromEnumArgs headListEffSet > 1 && nested headListEffSet = return newMultiArgSet
+    | otherwise = Nothing
+
+    where newOneArgSet = funcEdit setWithLeft newTypeListOne
+
+          newTypeListOne = case nTypeListOne of
+            TypeList listFromType -> TypeList $ inliningNum putNum listFromType
+            _ -> TypeList [putNum, TypeBool True]
+
+          nTypeListOne = funcGetEdit setWithLeftOne
+          setWithLeftOne = if isRightInSet headListEffSet
+            then setToType headListEffSet
+            else headListEffSet
+
+          newMultiArgSet = funcEdit setWithLeft $ TypeList (newTypeHeadEdit : tail listFromTypeEdit)
+          newTypeHeadEdit = typeHeadEdit {right = newTypeList}
+
+          newTypeList = case nTypeList of
+            TypeList listFromType -> TypeList $ inliningNum putNum listFromType
+            _ -> TypeList [putNum, TypeBool True]
+
+          nTypeList = right typeHeadEdit
+          typeHeadEdit = head listFromTypeEdit
+          listFromTypeEdit = list $ funcGetEdit setWithLeft
+          setWithLeft = if isRightInSet headListEffSet
+            then setToType headListEffSet
+            else headListEffSet
+
+-- Исправить подстановку голого `futureSet`
 multiDirect :: SpecialKey -> World -> World
 multiDirect key world@(EditSettings listEffSet :\^/ app)
-    | isThirdJust thNestedSet
-        = EditSettings (pureNestedSet : tailListEffSet) :\^/ app
-    | (futureSet /= EditSetVoid) = if isJust mFindSet
+    | fromEnumArgs headListEffSet == 1
+        = funcWorld $ if isNothing mMarker || not (bool marker)
+            then case mathDirKey Vertical key of
+                LT -> Nothing -- Ничего не делаю
+                EQ -> funcIf (futureSet == EditSetVoid) Nothing $ -- Меняю элемент Set
+                      funcIf (isJust mFindSet)
+                             (return (findSet : freeListMSet))
+                             (return (futureSet : listEffSet))
+                GT -> return (funcEdit s (returnE $ inliningMarker listFromType) : tailListEffSet) -- Ставлю маркер
+            else case mathDirKey Vertical key of
+                LT -> return (funcEdit s (returnE $ offMarker listFromType) : tailListEffSet) -- Отключаю маркер
+                EQ -> return (funcEdit s (returnE $ moveMarker listFromType) : tailListEffSet) -- Перемещаю маркер
+                GT -> Nothing -- Ничего не делаю
+    | fromEnumArgs headListEffSet > 1 && nested headListEffSet
+        = funcWorld $ if isNothing mMarker || not (bool marker)
+            then case mathDirKey dir key of
+                LT -> return (headListEffSet {nested = False} : tailListEffSet) -- Отключить nested
+                EQ -> if isJust mMoveType -- Переключить элемент Type
+                    then return (funcEdit s moveType : tailListEffSet)
+                    else Nothing
+                GT -> return (funcEdit s (returnE $ onMarker_Multi listFromType_Multi) : tailListEffSet) -- Включить marker
+            else case mathDirKey dir key of
+                LT -> return (funcEdit s (returnE $ offMarker_Multi listFromType_Multi) : tailListEffSet) -- Отключить маркер
+                EQ -> return (funcEdit s (returnE $ moveMarker_Multi listFromType_Multi) : tailListEffSet) -- Перемещаю маркер
+                GT -> Nothing -- Ничего не делаю
+    | futureSet /= EditSetVoid = if isJust mFindSet
         then EditSettings (findSet : freeListMSet) :\^/ app
         else EditSettings (futureSet : listEffSet) :\^/ app
     | otherwise = world
 
-    where funcDir = if key `elem` [KeyLeft, KeyUp] then pred else succ
-          (headListEffSet:tailListEffSet) = listEffSet
-          thNestedSet = nestedSet headListEffSet key funcDir
-          pureNestedSet = if isThirdRight thNestedSet
-            then fromThirdRight thNestedSet
-            else fromThirdLeft thNestedSet
+    where (headListEffSet:tailListEffSet) = listEffSet
+          s = headListEffSet
+          returnE = TypeList
+          newHead = if isRightInSet headListEffSet
+            then setToType headListEffSet
+            else headListEffSet
+          tTypeFromLeft = funcGetEdit newHead
+          listFromType = list tTypeFromLeft
+          funcWorld Nothing = EditSettings listEffSet :\^/ app
+          funcWorld (Just newListSet) = EditSettings newListSet :\^/ app
+
+          offMarker = subst (TypeBool False) isTypeBool
+          moveMarker = move (keyInBool key) isTypeBool
+
+          mMarker = find isTypeBool listFromType
+          marker = fromJust mMarker
+
+          mMoveType = nestedSwitchType tTypeFromLeft enumHead funcDir
+          moveType = fromJust mMoveType
+          onMarker_Multi l = curPair {right = TypeList $ inliningMarker l} : freeHeadList
+          offMarker_Multi l = curPair {right = TypeList $ subst (TypeBool False) isTypeBool l} : freeHeadList
+          moveMarker_Multi l = curPair {right = TypeList $ move (keyInBool key) isTypeBool l} : freeHeadList
+
+          enumHead = enumArgsSet $ initRightSet headListEffSet
+          dir = direct headListEffSet
+          funcDir = if key `elem` [KeyLeft, KeyUp] then pred else succ
+          (curPair:freeHeadList) = listFromType
+          tListFromType_Multi = right curPair
+          listFromType_Multi = list tListFromType_Multi
 
           futureSet = toEnum $ pred $ fromEnum headListEffSet
           mFindSet = find (mathElemEditSet futureSet) listEffSet
           findSet = fromJust mFindSet
+
           freeListMSet = delElem (mathElemEditSet futureSet) listEffSet
 
 
-nestedSet :: EditSet -> SpecialKey -> (Int -> Int) -> Third EditSet EditSet
-nestedSet headListEffSet key funcDir
-    | not $ mathDirKey dir key = ThirdLeft $ headListEffSet {nested = False}
-    | fromEnumArgs headListEffSet > 1 && nested headListEffSet && isJust mNewType
-        = ThirdRight $ newHead {edit = Left newType}
-    | otherwise = ThirdNothing
-
-    where dir = direct headListEffSet
-          newHead = if isRightInSet headListEffSet
-            then setToType headListEffSet
-            else headListEffSet
-          enumHead = enumArgsSet $ initRightSet headListEffSet
-          mNewType = nestedType (fromLeft $ edit newHead) enumHead funcDir
-          newType = fromJust mNewType
+--nestedSwitchSet :: [EditSet] -> SpecialKey -> (Int -> Int) -> Third EditSet EditSet
+--nestedSwitchSet (headListEffSet:tailListEffSet) key funcDir
 
 
-nestedType :: TypeTag -> Int -> (Int -> Int) -> Maybe TypeTag
-nestedType lTypeTags enumSet dir
+nestedSwitchType :: TypeTag -> Int -> (Int -> Int) -> Maybe TypeTag
+nestedSwitchType lTypeTags enumSet dir
     | futureNested >= 0 && futureNested <= enumSet
         = if isJust mFindType
             then return newListFindTypes
             else return newListCreateTypes
     | otherwise = Nothing
 
-    where TypeInt nestedOfType = headType $ headType lTypeTags
+    where lFromTypeTags = list lTypeTags
+          (curPair:freeHeadList) = list lTypeTags
+          TypeInt nestedOfType = left curPair
           futureNested = dir nestedOfType
           mFindType = findType mathType lTypeTags
           pureFindType = fromJust mFindType
-          freeListTypes = delElemType mathType lTypeTags
-          newListFindTypes = pureFindType +#+ freeListTypes
 
-          newType = TypeComp $ TypeInt futureNested :#+ TypeVoid
-          newListCreateTypes = newType +#+ lTypeTags
+          freeFindList = delElem mathType lFromTypeTags
+          newListFindTypes = TypeList (pureFindType : freeFindList)
 
-          mathType a | headType a == (TypeInt futureNested) = True
+          newPair = TypePair (TypeInt futureNested) TypeVoid
+          newListCreateTypes = TypeList (newPair : freeHeadList)
+
+          mathType a | left a == TypeInt futureNested = True
           mathType _ = False
 
 
@@ -178,7 +265,7 @@ main = do
     play (InWindow "Random Abacus" (horiz, vert) (0, 0))
          white
          30
-         (initWord gen)
+         (initWorld gen)
          picture
          handleKey
          update
