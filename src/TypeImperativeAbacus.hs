@@ -41,9 +41,20 @@ newtype Carriage = Carriage Int deriving (Show, Eq)
 newtype StartLine = StartLine Int deriving (Show, Eq)
 newtype LengthExpr = LengthExpr Int deriving (Show, Eq)
 newtype QuantityQuestion = QuantityQuestion Int deriving (Show, Eq)
-data Theme = ThemeVoid | Merely | Brother | Friend deriving (Show, Enum, Eq, Ord)
+data Theme = ThemeVoid | Merely | Brother | Friend deriving (Show, Eq, Ord)
 data RangeRows = RangeRows Int Int deriving (Show, Eq)
 
+
+instance Enum Theme where
+    toEnum 1 = Merely
+    toEnum 2 = Brother
+    toEnum 3 = Friend
+    toEnum _ = ThemeVoid
+
+    fromEnum ThemeVoid = 0
+    fromEnum Merely = 1
+    fromEnum Brother = 2
+    fromEnum Friend = 3
 
 instance Enum StartLine where
     toEnum 0 = initStartLine
@@ -149,3 +160,11 @@ initLengthExpr = LengthExpr 0
 initQuantityQuestion = QuantityQuestion 0
 initTheme = ThemeVoid
 initRangeRows = RangeRows 0 0
+
+isHoriz :: Direct -> Bool
+isHoriz Horizontal = True
+isHoriz _ = False
+
+isVert :: Direct -> Bool
+isVert Vertical = True
+isVert _ = False

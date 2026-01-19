@@ -28,6 +28,12 @@ data Done = Done deriving (Show, Eq, Ord)
 
 data Direct = Horizontal | Vertical deriving (Show, Eq, Ord)
 
+data Graph a
+    = GraphElement a
+    | GraphHorizontal [Graph a]
+    | GraphVertical [Graph a]
+    deriving Show
+
 instance Eq RowAbacus where
     RowAbacus leftLower leftUpper == RowAbacus rightLower rightUpper
         | (leftLower == rightLower) && (leftUpper == rightUpper) = True

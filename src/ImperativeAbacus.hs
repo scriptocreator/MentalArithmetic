@@ -4,32 +4,78 @@ module ImperativeAbacus where
 
 import TypeAbacus
 import TypeImperativeAbacus
-import PureFunctions ( sortTypeList, prodTypeToList, sumTypeToList, tailType )
+import PureFunctions ( sortTypeList, prodTypeToList, sumTypeToList, tailType, isTypeBool )
 
 import System.Random
 import System.Random.Stateful
 import Data.Maybe (fromJust, isJust)
 import Graphics.Gloss.Interface.Pure.Game
-import Data.Either
+import Data.Either ( fromLeft, fromRight )
+import Text.Printf (printf)
 
+
+
+setToGraph :: EditSet -> Graph String
+setToGraph set@(EditTheme {}) = GraphElement $ show $ fromRight ThemeVoid $ editTheme $ fromJust $ typeToSet set
+setToGraph set@(EditRangeRows {}) = 
+    let dir = direct set
+    in if isHoriz dir
+        then GraphHorizontal stringsArgs
+        else GraphVertical stringsArgs
+    
+    where typeList = fmap right $ sortTypeList $ list $ funcGetEdit set
+          stringsArgs = fmap (GraphElement . typeToString . list) typeList
+setToGraph set = GraphElement $ typeToString $ list $ funcGetEdit set
+
+
+typeToString :: [TypeTag] -> String
+typeToString [] = []
+typeToString (t:ts)
+    | fromEnum t < 10 = head (show $ fromEnum t) : typeToString ts
+    | isTypeBool t && bool t = '|' : typeToString ts
+    | otherwise = typeToString ts
+
+
+sortSetList :: [EditSet] -> [EditSet]
+sortSetList = nestedSort []
+
+    where nestedSort :: [(Int, EditSet)] -> [EditSet] -> [EditSet]
+          nestedSort sortList [] = fmap snd sortList
+          nestedSort sortList (s:ss) = 
+            let sortS = (fromEnum s, s)
+            in nestedSort (putSetList sortS sortList) ss
+
+
+putSetList :: (Int, EditSet) -> [(Int, EditSet)] -> [(Int, EditSet)]
+putSetList s [] = [s]
+putSetList s (sel:ss)
+    | fst s == fst sel
+        = error $ printf "Error ImperativeAbacus №1: Обнаружена ещё одна переменная под аргумент конструктора – «%s» и «%s»"
+                         (show arg1)
+                         (show arg2)
+    | fst s < fst sel = s : sel : ss
+    | otherwise = sel : putSetList s ss
+
+    where arg1 = snd s
+          arg2 = snd sel 
 
 
 funcGetEdit :: EditSet -> TypeTag
 funcGetEdit set = case set of
-    (EditStartLine _) -> fromLeft TypeVoid $ editStart set
-    (EditLengthExpr _) -> fromLeft TypeVoid $ editExpr set
-    (EditQuantityQuestion _) -> fromLeft TypeVoid $ editQuest set
-    (EditTheme _) -> fromLeft TypeVoid $ editTheme set
-    (EditRangeRows _ _ _) -> fromLeft TypeVoid $ editRange set
+    (EditStartLine {}) -> fromLeft TypeVoid $ editStart set
+    (EditLengthExpr {}) -> fromLeft TypeVoid $ editExpr set
+    (EditQuantityQuestion {}) -> fromLeft TypeVoid $ editQuest set
+    (EditTheme {}) -> fromLeft TypeVoid $ editTheme set
+    (EditRangeRows {}) -> fromLeft TypeVoid $ editRange set
 
 
-funcEdit :: EditSet -> TypeTag -> EditSet
-funcEdit set funcType = case set of
-    (EditStartLine _) -> set {editStart = Left funcType}
-    (EditLengthExpr _) -> set {editExpr = Left funcType}
-    (EditQuantityQuestion _) -> set {editQuest = Left funcType}
-    (EditTheme _) -> set {editTheme = Left funcType}
-    (EditRangeRows _ _ _) -> set {editRange = Left funcType}
+funcPutEdit :: EditSet -> TypeTag -> EditSet
+funcPutEdit set funcType = case set of
+    (EditStartLine {}) -> set {editStart = Left funcType}
+    (EditLengthExpr {}) -> set {editExpr = Left funcType}
+    (EditQuantityQuestion {}) -> set {editQuest = Left funcType}
+    (EditTheme {}) -> set {editTheme = Left funcType}
+    (EditRangeRows {}) -> set {editRange = Left funcType}
 
 
 numInRows :: Int -> [Int]
@@ -46,13 +92,13 @@ numInRows num = createRows num $ reverse $ accRows 1 9
           createRows nesNum (row:rows) = nesNum `div` row : createRows newNum rows
 
             where newNum = nesNum `div` 10
-        
+
           exponent num = num * 10 + num
 
 
 rowsInNum :: [Int] -> Int
 rowsInNum rows = nestedNum $ zip [1,10..] rows
-    
+
     where nestedNum [] = 0
           nestedNum ((level, var):rs) = level * var + nestedNum rs
 
@@ -70,7 +116,7 @@ inliningMarker (a:b) = a : inliningMarker b
 
 
 inliningNum :: TypeTag -> [TypeTag] -> [TypeTag]
-inliningNum num [] = num : TypeBool True : []
+inliningNum num [] = [num, TypeBool True]
 inliningNum num (TypeBool _:b) = num : TypeBool True : b
 inliningNum num (a:b) = a : inliningNum num b
 
@@ -94,11 +140,11 @@ figureIntToType n | n >= 0 && n < 10 = toEnum n
 figureIntToType _ = TypeVoid
 
 
-typeToListInt :: [TypeTag] -> [Int]
-typeToListInt [] = []
-typeToListInt (t:ts)
-    | curFigure < 10 = curFigure : typeToListInt ts
-    | otherwise = typeToListInt ts
+typeToFigureInt :: [TypeTag] -> [Int]
+typeToFigureInt [] = []
+typeToFigureInt (t:ts)
+    | curFigure < 10 = curFigure : typeToFigureInt ts
+    | otherwise = typeToFigureInt ts
 
     where curFigure = fromEnum t
 
@@ -120,18 +166,26 @@ enumArgsSet (EditTheme (Right e)) = fromEnumArgs e
 enumArgsSet (EditRangeRows _ _ (Right e)) = fromEnumArgs e
 
 
+enumSet :: EditSet -> Int
+enumSet (EditStartLine (Right e)) = fromEnum e
+enumSet (EditLengthExpr (Right e)) = fromEnum e
+enumSet (EditQuantityQuestion (Right e)) = fromEnum e
+enumSet (EditTheme (Right e)) = fromEnum e
+enumSet (EditRangeRows _ _ (Right e)) = fromEnum e
+
+
 initRightSet :: EditSet -> EditSet
-initRightSet (EditStartLine _) = EditStartLine $ Right initStartLine
-initRightSet (EditLengthExpr _) = EditLengthExpr $ Right initLengthExpr
-initRightSet (EditQuantityQuestion _) = EditQuantityQuestion $ Right initQuantityQuestion
-initRightSet (EditTheme _) = EditTheme $ Right initTheme
-initRightSet (EditRangeRows _ _ _) = EditRangeRows False Horizontal $ Right initRangeRows
+initRightSet (EditStartLine {}) = EditStartLine $ Right initStartLine
+initRightSet (EditLengthExpr {}) = EditLengthExpr $ Right initLengthExpr
+initRightSet (EditQuantityQuestion {}) = EditQuantityQuestion $ Right initQuantityQuestion
+initRightSet (EditTheme {}) = EditTheme $ Right initTheme
+initRightSet (EditRangeRows {}) = EditRangeRows False Horizontal $ Right initRangeRows
 
 
 setToType :: EditSet -> EditSet
-setToType (EditStartLine (Right (StartLine start))) = EditStartLine $ Left $ TypeInt start
-setToType (EditLengthExpr (Right (LengthExpr lenExpr))) = EditLengthExpr $ Left $ TypeInt lenExpr
-setToType (EditQuantityQuestion (Right (QuantityQuestion quant))) = EditQuantityQuestion $ Left $ TypeInt quant
+setToType (EditStartLine (Right (StartLine start))) = EditStartLine $ Left $ TypeList $ funcFromI start
+setToType (EditLengthExpr (Right (LengthExpr lenExpr))) = EditLengthExpr $ Left $ TypeList $ funcFromI lenExpr
+setToType (EditQuantityQuestion (Right (QuantityQuestion quant))) = EditQuantityQuestion $ Left $ TypeList $ funcFromI quant
 setToType (EditTheme (Right t)) = EditTheme $ Left $ TypeInt $ fromEnum t
 setToType (EditRangeRows nes dir (Right (RangeRows firstI secondI)))
     =  EditRangeRows nes dir $ Left $
@@ -140,9 +194,9 @@ setToType typeTag = typeTag
 
 
 typeToSet :: EditSet -> Maybe EditSet
-typeToSet (EditStartLine (Left (TypeInt start))) = Just $ EditStartLine $ Right $ StartLine start
-typeToSet (EditLengthExpr (Left (TypeInt lenExpr))) = Just $ EditLengthExpr $ Right $ LengthExpr lenExpr
-typeToSet (EditQuantityQuestion (Left (TypeInt quant))) = Just $ EditQuantityQuestion $ Right $ QuantityQuestion quant
+typeToSet (EditStartLine (Left (TypeList start))) = Just $ EditStartLine $ Right $ StartLine $ funcToI start
+typeToSet (EditLengthExpr (Left (TypeList lenExpr))) = Just $ EditLengthExpr $ Right $ LengthExpr $ funcToI lenExpr
+typeToSet (EditQuantityQuestion (Left (TypeList quant))) = Just $ EditQuantityQuestion $ Right $ QuantityQuestion $ funcToI quant
 typeToSet (EditTheme (Left (TypeInt i))) = Just $ EditTheme $ Right $ toEnum i
 typeToSet (EditRangeRows nes dir (Left (TypeList myType@[TypePair (TypeInt _) (TypeList _), TypePair (TypeInt _) (TypeList _)])))
     = if length typeList == fromEnumArgs initRangeRows
@@ -152,7 +206,7 @@ typeToSet (EditRangeRows nes dir (Left (TypeList myType@[TypePair (TypeInt _) (T
     where typeList = fmap right $ sortTypeList myType
           [TypeList firstI, TypeList secondI] = typeList
 
-typeToSet right | isRightInSet right = Just right
+typeToSet r | isRightInSet r = Just r
 typeToSet _ = Nothing
 
 
@@ -160,7 +214,7 @@ funcFromI :: Int -> [TypeTag]
 funcFromI i = fmap figureIntToType $ numInRows i
 
 funcToI :: [TypeTag] -> Int
-funcToI tl = rowsInNum $ typeToListInt tl
+funcToI tl = rowsInNum $ typeToFigureInt tl
 
 
 isRightInSet :: EditSet -> Bool

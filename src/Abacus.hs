@@ -6,7 +6,8 @@ import TypeAbacus
 import PureFunctions
 import LazyFunctions
 import ImperativeAbacus
-import System.Random.Stateful
+
+import System.Random.Stateful ( StdGen )
 
 infixr 6 --!
 

@@ -36,17 +36,17 @@ sortTypeList = nestedSort []
 
     where nestedSort :: [TypeTag] -> [TypeTag] -> [TypeTag]
           nestedSort sortList [] = sortList
-          nestedSort sortList (t:ls) = nestedSort (setTypeList t sortList) ls
+          nestedSort sortList (t:ls) = nestedSort (putTypeList t sortList) ls
 
-setTypeList :: TypeTag -> [TypeTag] -> [TypeTag]
-setTypeList t [] = [t]
-setTypeList t (tel:ls)
+putTypeList :: TypeTag -> [TypeTag] -> [TypeTag]
+putTypeList t [] = [t]
+putTypeList t (tel:ls)
     | left t == left tel
         = error $ printf "Error PureFunctions №1: Обнаружена ещё одна переменная под аргумент конструктора – «%s» и «%s»"
                          (show arg1)
                          (show arg2)
     | left t < left tel = t : tel : ls
-    | otherwise = tel : setTypeList t ls
+    | otherwise = tel : putTypeList t ls
 
     where arg1 = right t
           arg2 = right tel 
@@ -175,11 +175,17 @@ substType el log x
     | otherwise = x
 
 
+isTypeList :: TypeTag -> Bool
 isTypeList (TypeList {}) = True
 isTypeList _ = False
 
+isTypeBool :: TypeTag -> Bool
 isTypeBool (TypeBool {}) = True
 isTypeBool _ = False
+
+isTypeInt :: TypeTag -> Bool
+isTypeInt (TypeInt {}) = True
+isTypeInt _ = False
 
 
 subst :: a -> (a -> Bool) -> [a] -> [a]
