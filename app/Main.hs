@@ -13,6 +13,7 @@ import Graphics.Gloss.Interface.Pure.Game
 import Data.Maybe (fromJust, isJust, isNothing, catMaybes)
 import Data.List (find)
 import Data.Either (fromLeft)
+import Data.Tuple.Extra
 
 
 
@@ -26,12 +27,14 @@ halfVert :: Int
 halfVert = vert `div` 2
 
 initWorld :: StdGen -> World
-initWorld gen = EditSettings [EditStartLine (Right $ StartLine (-halfHoriz))] :\^/ EditApp [EditRandom gen]
+initWorld gen
+    = EditSettings [EditStartLine (Right $ StartLine (-halfHoriz))]
+    :\^/ App (Expressions []) gen (Carriage 0) (50, 20, 10)
 
 
 picture :: World -> Picture
 picture (EditSettings sets :\^/ _) = Blank
-picture (App (Expressions exprs) _ _ :\^/ Settings (StartLine start) (LengthExpr lenExpr) _ _ _) = pictures allPicturies
+picture (App (Expressions exprs) _ _ _ :\^/ Settings (StartLine start) (LengthExpr lenExpr) _ _ _) = pictures allPicturies
 
     where funcSplitLinesAbacus :: [Abacus] -> [String]
           funcSplitLinesAbacus a = fmap unlines $ splitList lenExpr $ exprAbacusInList a
@@ -50,22 +53,51 @@ outputAbacusis (current, predPictures) (str:ss)
     where newCurrent = current + 20
 
 
+outputSettings :: Direct
+               -> ((Float, Float, Float) -> (Float, Float) -> (Float, Float))
+               -> (Float, Float, Float)
+               -> ([Picture], (Float, Float))
+               -> Graph String
+               -> ([Picture], (Float, Float))
+outputSettings dir f indentDirect (oldSet, curDirect@(curHoriz, curVert)) (GraphElement string)
+    = let futureDirect = f indentDirect curDirect
+    in (oldSet ++ [pictures [Translate curHoriz curVert $ Text string]], futureDirect)
+
+outputSettings dir f indentDirect (oldSet, curDirect) (GraphHorizontal graphs)
+    = let nesDirect = if isHoriz dir
+            then (fst curDirect, snd curDirect - thd3 indentDirect)
+            else curDirect
+    in foldl (outputSettings Horizontal funcHoriz indentDirect) ([], nesDirect) graphs
+
+outputSettings dir f indentDirect (oldSet, curDirect) (GraphVertical graphs)
+    = let nesDirect = if isVert dir
+            then (fst curDirect + thd3 indentDirect, snd curDirect)
+            else curDirect
+    in foldl (outputSettings Vertical funcVert indentDirect) ([], nesDirect) graphs
+
+
+funcHoriz :: (Float, Float, Float) -> (Float, Float) -> (Float, Float)
+funcHoriz (_, baseVert, _) (horiz, _) = (horiz, baseVert)
+
+funcVert :: (Float, Float, Float) -> (Float, Float) -> (Float, Float)
+funcVert (baseHoriz, _, _) (_, vert) = (baseHoriz, vert)
+
+
 handleKey :: Event -> World -> World
-handleKey (EventKey (SpecialKey KeyCtrlL) Down _ _) (world@(EditApp {}) :\^/ set@(EditSettings {}))
+handleKey (EventKey (SpecialKey KeyCtrlL) Down _ _) (world@(App {}) :\^/ set@(EditSettings {}))
     = error "В состоянии редактирования, невозможно переключиться на редактирование приложения"
 
 
-handleKey (EventKey (SpecialKey KeyCtrlL) Down _ _) world@(EditSettings listEffSet :\^/ EditApp listEffApp)
-    | isJust mListSet && isJust mListApp && all isJust listMSet && theme /= ThemeVoid
-        = App (Expressions finalExpr) finalGen carr :\^/ Settings start lenExpr quant theme range
+handleKey (EventKey (SpecialKey KeyCtrlL) Down _ _) world@(EditSettings listEffSet :\^/ app)
+    | isJust mListSet && all isJust listMSet && theme /= ThemeVoid
+        = App (Expressions finalExpr) finalGen mCarr indents :\^/ Settings start lenExpr quant theme range
     | otherwise = world
 
     where mListSet = sortEditSet listEffSet
-          mListApp = sortEditApp listEffApp
           listMSet = fmap typeToSet $ fromJust mListSet
           listSet = catMaybes listMSet
           [EditStartLine (Right start), EditLengthExpr (Right lenExpr), EditQuantityQuestion (Right quant), EditTheme (Right theme), EditRangeRows _ _ (Right range)] = listSet
-          [EditExpressions expr, EditRandom rand, EditCarriage carr] = fromJust mListApp
+          App (Expressions expr) rand mCarr indents = app
 
           LengthExpr pureLenExpr = lenExpr
           QuantityQuestion pureQuant = quant
@@ -88,14 +120,13 @@ handleKey (EventKey (SpecialKey KeyCtrlL) Down _ _) world@(EditSettings listEffS
                       (lazyReadyExpr, secondGen) = rep firstGen
                       readyExpr = take adjustmentLenExpr lazyReadyExpr
                       (freeBaseAbacus, thirdGen) = abac secondGen baseAbacus readyExpr
-                      (futureGenericExpr, finalGen) = generator thirdGen $ pred n
+                      (futureGenericExpr, finalGen) = (generator thirdGen . pred) n
 
 
-handleKey (EventKey (SpecialKey KeyCtrlL) Down _ _) (App expr rand carr :\^/ Settings start lenExpr quant theme range)
-    = EditSettings editListSet :\^/ EditApp editListApp
+handleKey (EventKey (SpecialKey KeyCtrlL) Down _ _) (app :\^/ Settings start lenExpr quant theme range)
+    = EditSettings editListSet :\^/ app
 
-    where editListApp = [EditExpressions expr, EditRandom rand, EditCarriage carr]
-          editListSet = [EditStartLine (Right start)
+    where editListSet = [EditStartLine (Right start)
                         ,EditLengthExpr (Right lenExpr)
                         ,EditQuantityQuestion (Right quant)
                         ,EditTheme (Right theme)
@@ -133,7 +164,7 @@ nestedPutSet headListEffSet putNum
     | fromEnumArgs headListEffSet > 1 && nested headListEffSet = return newMultiArgSet
     | otherwise = Nothing
 
-    where newOneArgSet = funcPutEdit setWithLeft $ newTypeList nTypeListOne
+    where newOneArgSet = (funcPutEdit setWithLeft . newTypeList) nTypeListOne
 
           nTypeListOne = funcGetEdit setWithLeft
 
@@ -160,7 +191,7 @@ multiDirect key world@(EditSettings listEffSet :\^/ app)
                (case mathDirKey Vertical key of
                 LT -> Nothing -- Ничего не делаю
                 EQ -> return (funcPutEdit s (TypeInt futureInt) : tailListEffSet) -- Переключаю theme
-                GT -> Nothing ) $ -- Ничего не делаю
+                GT -> Nothing ) $ -- Ничего не делаю -- Ничего не делаю
         funcIf (isNothing mMarker || not (bool marker))
                (case mathDirKey Vertical key of
                 LT -> Nothing -- Ничего не делаю
@@ -206,8 +237,8 @@ multiDirect key world@(EditSettings listEffSet :\^/ app)
           funcDir = if key `elem` [KeyLeft, KeyUp] then pred else succ
           funcWorld Nothing = EditSettings listEffSet :\^/ app
           funcWorld (Just newListSet) = EditSettings newListSet :\^/ app
-          
-          futureInt = toEnum $ fromEnum $ funcDir $ enumSet headListEffSet
+
+          futureInt = (toEnum . fromEnum . funcDir . enumSet) headListEffSet
 
           offMarker = subst (TypeBool False) isTypeBool
           moveMarker = move (keyInBool key) isTypeBool
@@ -221,13 +252,13 @@ multiDirect key world@(EditSettings listEffSet :\^/ app)
           offMarker_Multi l = curPair {right = TypeList $ subst (TypeBool False) isTypeBool l} : freeHeadList
           moveMarker_Multi l = curPair {right = TypeList $ move (keyInBool key) isTypeBool l} : freeHeadList
 
-          enumHead = enumArgsSet $ initRightSet headListEffSet
+          enumHead = (enumArgsSet . initRightSet) headListEffSet
           dir = direct headListEffSet
           (curPair:freeHeadList) = listFromTypeLeft
           tListFromType_Multi = right curPair
           listFromType_Multi = list tListFromType_Multi
 
-          futureSet = toEnum $ pred $ fromEnum headListEffSet
+          futureSet = (toEnum . pred . fromEnum) headListEffSet
           mFindSet = find (mathElemEditSet futureSet) listEffSet
           findSet = fromJust mFindSet
 

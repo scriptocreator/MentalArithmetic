@@ -11,21 +11,20 @@ infixr 6 :\^/
 
 
 data World
-    = EditApp [EditApp]
-    | EditSettings [EditSet]
+    = EditSettings [EditSet]
 
-    | App Expressions StdGen Carriage
+    | App Expressions StdGen Carriage (Float, Float, Float)
     | Settings StartLine LengthExpr QuantityQuestion Theme RangeRows
 
     | World :\^/ World
-
+{-
 data EditApp
     = EditAppVoid
     | EditExpressions Expressions
     | EditRandom StdGen
     | EditCarriage Carriage
     deriving (Show, Eq)
-
+-}
 data EditSet
     = EditSetVoid
     | EditStartLine {editStart :: Either TypeTag StartLine}
@@ -109,7 +108,7 @@ instance EnumArgs RangeRows where
     
     fromEnumArgs (RangeRows {}) = 2
 
-
+{-
 instance Enum EditApp where
     toEnum 0 = EditAppVoid
     toEnum 1 = EditExpressions (Expressions [])
@@ -121,7 +120,7 @@ instance Enum EditApp where
     fromEnum (EditExpressions _) = 1
     fromEnum (EditRandom _) = 2
     fromEnum (EditCarriage _) = 3
-
+-}
 instance Enum EditSet where
     toEnum 0 = EditSetVoid
     toEnum 1 = EditStartLine (Left TypeVoid)

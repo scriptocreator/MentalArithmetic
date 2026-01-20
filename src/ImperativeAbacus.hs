@@ -16,22 +16,22 @@ import Text.Printf (printf)
 
 
 setToGraph :: EditSet -> Graph String
-setToGraph set@(EditTheme {}) = GraphElement $ show $ fromRight ThemeVoid $ editTheme $ fromJust $ typeToSet set
+setToGraph set@(EditTheme {}) = (GraphElement . show . fromRight ThemeVoid . editTheme . fromJust) $ typeToSet set
 setToGraph set@(EditRangeRows {}) = 
     let dir = direct set
     in if isHoriz dir
         then GraphHorizontal stringsArgs
         else GraphVertical stringsArgs
     
-    where typeList = fmap right $ sortTypeList $ list $ funcGetEdit set
+    where typeList = (fmap right . sortTypeList . list) $ funcGetEdit set
           stringsArgs = fmap (GraphElement . typeToString . list) typeList
-setToGraph set = GraphElement $ typeToString $ list $ funcGetEdit set
+setToGraph set = (GraphElement . typeToString . list) $ funcGetEdit set
 
 
 typeToString :: [TypeTag] -> String
 typeToString [] = []
 typeToString (t:ts)
-    | fromEnum t < 10 = head (show $ fromEnum t) : typeToString ts
+    | fromEnum t < 10 = (head . show . fromEnum) t : typeToString ts
     | isTypeBool t && bool t = '|' : typeToString ts
     | otherwise = typeToString ts
 
@@ -203,7 +203,7 @@ typeToSet (EditRangeRows nes dir (Left (TypeList myType@[TypePair (TypeInt _) (T
         then Just $ EditRangeRows nes dir $ Right $ RangeRows (funcToI firstI) (funcToI secondI)
         else Nothing
 
-    where typeList = fmap right $ sortTypeList myType
+    where typeList = (fmap right . sortTypeList) myType
           [TypeList firstI, TypeList secondI] = typeList
 
 typeToSet r | isRightInSet r = Just r
@@ -234,7 +234,7 @@ mathElemEditSet (EditTheme {}) (EditTheme {}) = True
 mathElemEditSet (EditRangeRows {}) (EditRangeRows {}) = True
 mathElemEditSet _ _ = False
 
-
+{-
 sortEditApp :: [EditApp] -> Maybe [EditApp]
 sortEditApp = nestedSort Nothing Nothing Nothing
 
@@ -243,7 +243,7 @@ sortEditApp = nestedSort Nothing Nothing Nothing
           nestedSort expr rand carr (x@(EditRandom {}):xs)      = nestedSort expr (return x) carr xs
           nestedSort expr rand carr (x@(EditCarriage {}):xs)    = nestedSort expr rand (return x) xs
           nestedSort _ _ _ _ = Nothing
-
+-}
 
 sortEditSet :: [EditSet] -> Maybe [EditSet]
 sortEditSet = nestedSort Nothing Nothing Nothing Nothing Nothing
