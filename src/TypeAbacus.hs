@@ -58,6 +58,8 @@ data TypeTag = Sum0
     | Sum81 | Sum82 | Sum83 | Sum84 | Sum85 | Sum86 | Sum87 | Sum88 | Sum89 | Sum90
     | Sum91 | Sum92 | Sum93 | Sum94 | Sum95 | Sum96 | Sum97 | Sum98 | Sum99 | Sum100
 
+    | Negative
+
     | TypeVoid
     | TypeBool {bool :: Bool}
     | TypeInt {int :: Int}
@@ -168,7 +170,7 @@ instance Enum TypeTag where
 
     fromEnum Sum91 = 91; fromEnum Sum92 = 92; fromEnum Sum93 = 93; fromEnum Sum94 = 94; fromEnum Sum95 = 95
     fromEnum Sum96 = 96; fromEnum Sum97 = 97; fromEnum Sum98 = 98; fromEnum Sum99 = 99; fromEnum Sum100 = 100
-    fromEnum n = 101
+    fromEnum n = 102
 
 class EnumArgs a where
     toEnumArgs :: Int -> a -> Bool 

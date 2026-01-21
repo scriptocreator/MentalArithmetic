@@ -10,6 +10,7 @@ import ImperativeAbacus
 import System.Random ( StdGen, newStdGen )
 import Graphics.Gloss
 import Graphics.Gloss.Interface.Pure.Game
+import Graphics.Gloss.Data.Color
 import Data.Maybe (fromJust, isJust, isNothing, catMaybes)
 import Data.List (find)
 import Data.Either (fromLeft)
@@ -29,12 +30,19 @@ halfVert = vert `div` 2
 initWorld :: StdGen -> World
 initWorld gen
     = EditSettings [EditStartLine (Right $ StartLine (-halfHoriz))]
-    :\^/ App (Expressions []) gen (Carriage 0) (50, 20, 10)
+    :\^/ App (Expressions []) gen (Carriage 0) (50, 20, 10) (Carriage 0)
 
 
 picture :: World -> Picture
-picture (EditSettings sets :\^/ _) = Blank
-picture (App (Expressions exprs) _ _ _ :\^/ Settings (StartLine start) (LengthExpr lenExpr) _ _ _) = pictures allPicturies
+picture (EditSettings sets :\^/ App _ _ _ indent mCarrSet) = pictures allPicturies
+
+    where graphs = fmap setToGraph sets
+          (allPicturies, _) = foldl
+            (outputSettings Vertical funcVert indent)
+            ([], (0, 0)) -- (fromIntegral (-halfHoriz), fromIntegral halfVert))
+            graphs
+
+picture (App (Expressions exprs) _ _ _ _ :\^/ Settings (StartLine start) (LengthExpr lenExpr) _ _ _) = pictures allPicturies
 
     where funcSplitLinesAbacus :: [Abacus] -> [String]
           funcSplitLinesAbacus a = fmap unlines $ splitList lenExpr $ exprAbacusInList a
@@ -61,7 +69,7 @@ outputSettings :: Direct
                -> ([Picture], (Float, Float))
 outputSettings dir f indentDirect (oldSet, curDirect@(curHoriz, curVert)) (GraphElement string)
     = let futureDirect = f indentDirect curDirect
-    in (oldSet ++ [pictures [Translate curHoriz curVert $ Text string]], futureDirect)
+    in (oldSet ++ [pictures [Translate curHoriz curVert $ Color black $ Text string]], futureDirect)
 
 outputSettings dir f indentDirect (oldSet, curDirect) (GraphHorizontal graphs)
     = let nesDirect = if isHoriz dir
@@ -90,14 +98,14 @@ handleKey (EventKey (SpecialKey KeyCtrlL) Down _ _) (world@(App {}) :\^/ set@(Ed
 
 handleKey (EventKey (SpecialKey KeyCtrlL) Down _ _) world@(EditSettings listEffSet :\^/ app)
     | isJust mListSet && all isJust listMSet && theme /= ThemeVoid
-        = App (Expressions finalExpr) finalGen mCarr indents :\^/ Settings start lenExpr quant theme range
+        = App (Expressions finalExpr) finalGen mCarrApp indents mCarrSet :\^/ Settings start lenExpr quant theme range
     | otherwise = world
 
     where mListSet = sortEditSet listEffSet
           listMSet = fmap typeToSet $ fromJust mListSet
           listSet = catMaybes listMSet
           [EditStartLine (Right start), EditLengthExpr (Right lenExpr), EditQuantityQuestion (Right quant), EditTheme (Right theme), EditRangeRows _ _ (Right range)] = listSet
-          App (Expressions expr) rand mCarr indents = app
+          App (Expressions expr) rand mCarrApp indents mCarrSet = app
 
           LengthExpr pureLenExpr = lenExpr
           QuantityQuestion pureQuant = quant

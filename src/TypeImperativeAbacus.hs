@@ -1,4 +1,4 @@
-{-# LANGUAGE DuplicateRecordFields, Strict, StrictData #-}
+{-# LANGUAGE DuplicateRecordFields, {-Strict,-} StrictData #-}
 
 module TypeImperativeAbacus where
 
@@ -13,10 +13,11 @@ infixr 6 :\^/
 data World
     = EditSettings [EditSet]
 
-    | App Expressions StdGen Carriage (Float, Float, Float)
+    | App Expressions StdGen Carriage (Float, Float, Float) Carriage
     | Settings StartLine LengthExpr QuantityQuestion Theme RangeRows
 
     | World :\^/ World
+    deriving Show
 {-
 data EditApp
     = EditAppVoid

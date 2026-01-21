@@ -1,4 +1,4 @@
-{-# LANGUAGE Strict #-}
+-- {-# LANGUAGE Strict #-}
 
 module ImperativeAbacus where
 
@@ -23,15 +23,16 @@ setToGraph set@(EditRangeRows {}) =
         then GraphHorizontal stringsArgs
         else GraphVertical stringsArgs
     
-    where typeList = (fmap right . sortTypeList . list) $ funcGetEdit set
+    where typeList = (fmap right . sortTypeList . list) $ funcGetEdit (setToType set)
           stringsArgs = fmap (GraphElement . typeToString . list) typeList
-setToGraph set = (GraphElement . typeToString . list) $ funcGetEdit set
+
+setToGraph set = (GraphElement . typeToString . list) $ funcGetEdit (setToType set)
 
 
 typeToString :: [TypeTag] -> String
 typeToString [] = []
 typeToString (t:ts)
-    | fromEnum t < 10 = (head . show . fromEnum) t : typeToString ts
+    | fromEnum t < 10 = (show . fromEnum) t ++ typeToString ts
     | isTypeBool t && bool t = '|' : typeToString ts
     | otherwise = typeToString ts
 

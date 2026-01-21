@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleInstances, Strict #-}
+{-# LANGUAGE FlexibleInstances{-, Strict-} #-}
 
 module Abacus where
 
