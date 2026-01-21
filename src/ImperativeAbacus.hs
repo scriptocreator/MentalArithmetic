@@ -263,11 +263,13 @@ powerInAbacus gen (numLower, numUpper) = (RowAbacus newLower newUpper, finalGen)
     where (randomLower, firstGen) = randomR (0, numLower) gen
           newLower = replicate randomLower Done
 
-          (newUpper, finalGen) = if numUpper == 0
-            then (False, firstGen)
-            else let (num, secondGen) = randomR (0, numUpper) firstGen
-                     curUpper = (num /= 0)
-              in (curUpper, secondGen)
+          (newUpper, finalGen) =
+            let (num, secondGen) = randomR (0, numUpper) firstGen
+                curUpper = num /= 0
+            in if numUpper == 0
+                then (False, firstGen)
+                else (curUpper, secondGen)
+
 --powerInAbacus (numLower, numUpper) = RowAbacus (take numLower $ repeat Done) (if numUpper == 0 then False else True)
 
 

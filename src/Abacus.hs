@@ -47,15 +47,16 @@ instance Num [RowAbacus] where
 
     (RowAbacus leftLower leftUpper:ls) - (RowAbacus rightLower rightUpper:rs)
         | not leftUpper && rightUpper =
-            let newrs = balanceRow rs
+            let newls = balanceRow ls
             in if negLower < 0
-                then RowAbacus balanceBone True : ls - newrs
-                else RowAbacus balanceNegBone False : ls - newrs
+                then RowAbacus balanceNegBone False : newls - rs
+                else RowAbacus balanceBone True : newls - rs
 
-        | not (leftUpper || rightUpper) || (leftUpper && rightUpper) = if negLower < 0
-            then let newrs = balanceRow rs
-                in RowAbacus balanceNegBone True : ls - newrs
-            else RowAbacus balanceBone False : ls - rs
+        | not (leftUpper || rightUpper) || (leftUpper && rightUpper) =
+            let newls = balanceRow ls
+            in if negLower < 0
+                then RowAbacus balanceNegBone True : newls - rs
+                else RowAbacus balanceBone False : ls - rs
 
         -- В случае, если левая 5 присутствует, а правая нет
         | otherwise =
@@ -70,13 +71,15 @@ instance Num [RowAbacus] where
               balanceBone = leftLower --! rightLower
 
 
+balanceRow :: [RowAbacus] -> [RowAbacus]
 balanceRow [] = error "Error Abacus №2: У абакуса обнаружены пустые разряды"
 balanceRow (RowAbacus (_:lowers) upper:rows) = RowAbacus lowers upper : rows
 balanceRow (RowAbacus [] True:rows) = RowAbacus [Done, Done, Done, Done] False : rows
 balanceRow (_:rows) = RowAbacus [Done, Done, Done, Done] True : balanceRow rows
 
 (--!) :: [Done] -> [Done] -> [Done]
-[] --! _ = []
+[] --! [] = []
+[] --! _ = error "Error Abacus N3: Для натурального счёта, вычитается большее число косточек"
 a --! [] = a
 (Done:fis) --! (Done:sis) = fis --! sis
 
@@ -88,11 +91,13 @@ curMerelyAbacus gen abacus (expr:fs)
         in (operExpr : Abacus curAbacus : futureAbacusis, futureGen)
 
     where logExpr = operator expr
-          (curAbacus, newGen) = newAbacusAndGen gen f abacus
           (randomExpr, f, operExpr) = if logExpr
             then ((+), newMerelyAbacusPlus, Plus)
             else ((-), newMerelyAbacusMinus, Minus)
-          newStandAbacus = abacus `randomExpr` curAbacus -- Применение операции на аргументах
+           -- Создание текущего аргумента @curAbacus, по диапазонам и теме
+          (curAbacus, newGen) = newAbacusAndGen gen f abacus
+          -- Применение операции @randomExpr на аргументах
+          newStandAbacus = abacus `randomExpr` curAbacus
 
 curBrotherAbacus :: StdGen -> [RowAbacus] -> [Expr] -> ([Abacus], StdGen)
 curBrotherAbacus gen abacus [] = ([Abacus abacus], gen)
@@ -101,10 +106,10 @@ curBrotherAbacus gen abacus (expr:fs)
         in (operExpr : Abacus curAbacus : futureAbacusis, futureGen)
 
     where (logExpr, logPlus) = (operator expr, ifPlus expr)
-          (curAbacus, newGen) = newAbacusAndGen gen (f logPlus) abacus
           (randomExpr, f, operExpr) = if logExpr
             then ((+), newBrotherAbacusPlus, Plus)
             else ((-), newBrotherAbacusMinus, Minus)
+          (curAbacus, newGen) = newAbacusAndGen gen (f logPlus) abacus
           newStandAbacus = abacus `randomExpr` curAbacus
 
 curFriendAbacus :: StdGen -> [RowAbacus] -> [Expr] -> ([Abacus], StdGen)
@@ -114,14 +119,14 @@ curFriendAbacus gen abacus (expr:fs)
         in (operExpr : Abacus curAbacus : futureAbacusis, futureGen)
 
     where logExpr = operator expr
-          (curAbacus, newGen) = newAbacusAndGen gen f abacus
           (randomExpr, f, operExpr) = if logExpr
             then ((+), newFriendAbacusPlus, Plus)
             else ((-), newFriendAbacusMinus, Minus)
+          (curAbacus, newGen) = newAbacusAndGen gen f abacus
           newStandAbacus = abacus `randomExpr` curAbacus
 
 
-newAbacusAndGen :: StdGen -> (RowAbacus -> (Int, Int)) -> [RowAbacus] -> ([RowAbacus], StdGen) -- Создание текущего аргумента, по диапазонам и теме
+newAbacusAndGen :: StdGen -> (RowAbacus -> (Int, Int)) -> [RowAbacus] -> ([RowAbacus], StdGen)
 newAbacusAndGen gen _ [] = ([], gen)
 newAbacusAndGen gen f (row:as) =
     let (curRow, firstGen) = powerInAbacus gen $ f row
@@ -137,7 +142,7 @@ newMerelyAbacusPlus (RowAbacus lower upper)
 
 newBrotherAbacusPlus :: Bool -> RowAbacus -> (Int, Int)
 newBrotherAbacusPlus log (RowAbacus lower upper)
-    | upper = (4, 0)
+    | upper = (powerLower, 0)
     | otherwise = if log
         then (powerLower, 1)
         else (4, 0)
@@ -158,11 +163,11 @@ newBrotherAbacusMinus :: Bool -> RowAbacus -> (Int, Int)
 newBrotherAbacusMinus log (RowAbacus lower upper)
     | upper = (powerLower, 1)
     | otherwise = (powerLower, 0)
-    where powerLower = 4 - length lower
+    where powerLower = length lower
 
 -- Потом допишу «Друг + Брат»
 newFriendAbacusMinus :: RowAbacus -> (Int, Int)
 newFriendAbacusMinus (RowAbacus lower upper) = (4, 1)
 
 newAbacus :: (Int, Int)
-newAbacus = (4,1)
+newAbacus = (4, 1)
