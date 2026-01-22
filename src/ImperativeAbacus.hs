@@ -4,11 +4,11 @@ module ImperativeAbacus where
 
 import TypeAbacus
 import TypeImperativeAbacus
-import PureFunctions ( sortTypeList, prodTypeToList, sumTypeToList, tailType, isTypeBool )
+import PureFunctions ( sortTypeList, prodTypeToList, sumTypeToList, tailType, isTypeBool, funcIf )
 
-import System.Random
+import System.Random ( StdGen, Random(randomR) )
 import System.Random.Stateful
-import Data.Maybe (fromJust, isJust)
+import Data.Maybe (fromJust, isJust, isNothing)
 import Graphics.Gloss.Interface.Pure.Game
 import Data.Either ( fromLeft, fromRight )
 import Text.Printf (printf)
@@ -16,21 +16,34 @@ import Text.Printf (printf)
 
 
 setToGraph :: EditSet -> Graph String
-setToGraph set@(EditTheme {}) = (GraphElement . show . fromRight ThemeVoid . editTheme . fromJust) $ typeToSet set
+setToGraph set@(EditTheme {}) =
+    let mSet = typeToSet set
+        reallySet = fromJust mSet
+    in if isNothing mSet
+        then (GraphElement . show) initTheme
+        else (GraphElement . show . fromRight ThemeVoid . editTheme) reallySet
+
 setToGraph set@(EditRangeRows {}) = 
     let dir = direct set
-    in if isHoriz dir
-        then GraphHorizontal stringsArgs
-        else GraphVertical stringsArgs
+    in funcIf (tlSet == TypeVoid) (GraphElement "") $
+       funcIf (isHoriz dir)
+              (GraphHorizontal stringsArgs)
+              (GraphVertical stringsArgs)
     
-    where typeList = (fmap right . sortTypeList . list) $ funcGetEdit (setToType set)
+    where tlSet = funcGetEdit (setToType set)
+          typeList = (fmap right . sortTypeList . list) tlSet
           stringsArgs = fmap (GraphElement . typeToString . list) typeList
 
-setToGraph set = (GraphElement . typeToString . list) $ funcGetEdit (setToType set)
+setToGraph set
+    = let typeTag = funcGetEdit (setToType set)
+    in if typeTag == TypeVoid
+        then GraphElement ""
+        else (GraphElement . typeToString . list) typeTag
 
 
 typeToString :: [TypeTag] -> String
 typeToString [] = []
+typeToString (TypeNegative:ts) = '-' : typeToString ts
 typeToString (t:ts)
     | fromEnum t < 10 = (show . fromEnum) t ++ typeToString ts
     | isTypeBool t && bool t = '|' : typeToString ts
@@ -79,29 +92,44 @@ funcPutEdit set funcType = case set of
     (EditRangeRows {}) -> set {editRange = Left funcType}
 
 
-numInRows :: Int -> [Int]
-numInRows num = createRows num $ reverse $ accRows 1 9
+numInRows :: Int -> Number [Int]
+numInRows num = if num < 0
+    then NumberNegative listNumber
+    else NumberNatural listNumber
 
-    where accRows row rowNum
-            | num <= rowNum = [row]
-            | otherwise = row : accRows newRow curRowNum
+    where absNum = abs num
 
-            where curRowNum = exponent rowNum
-                  newRow = row * 10
+          accRows rowSimula numSimula
+            | absNum <= numSimula = [tupleRow]
+            | otherwise = tupleRow : accRows newRow newNumSimula
 
-          createRows _ [] = []
-          createRows nesNum (row:rows) = nesNum `div` row : createRows newNum rows
+            where tupleRow = (newRow, rowSimula)
+                  newRow = rowSimula * 10
+                  newNumSimula = exponent numSimula
+                  
+          createRows [] = []
+          createRows ((modRow, divRow):rows)
+            = absNum `mod` modRow `div` divRow : createRows rows
 
-            where newNum = nesNum `div` 10
+          exponent sim = sim * 10 + sim
 
-          exponent num = num * 10 + num
+          listNumber = createRows $ reverse $ accRows 1 9
 
 
-rowsInNum :: [Int] -> Int
-rowsInNum rows = nestedNum $ zip [1,10..] rows
+rowsInNum :: Number [Int] -> Int
+rowsInNum nRows = if isNegative nRows
+    then (-unitNumber)
+    else unitNumber
 
-    where nestedNum [] = 0
+    where rows :: [Int]
+          rows = number nRows
+
+          nestedNum :: [(Int, Int)] -> Int
+          nestedNum [] = 0
           nestedNum ((level, var):rs) = level * var + nestedNum rs
+
+          unitNumber :: Int
+          unitNumber = nestedNum $ zip [1,10..] rows
 
 
 keyInBool :: SpecialKey -> Bool
@@ -133,19 +161,35 @@ figureCharToType '7' = Sum7
 figureCharToType '8' = Sum8
 figureCharToType '9' = Sum9
 figureCharToType '0' = Sum0
+figureCharToType '-' = TypeNegative
 figureCharToType _ = TypeVoid
 
 
-figureIntToType :: Int -> TypeTag
-figureIntToType n | n >= 0 && n < 10 = toEnum n
-figureIntToType _ = TypeVoid
+figureIntToType :: Number [Int] -> [TypeTag]
+figureIntToType nListNum = if isNegative nListNum
+    then TypeNegative : listType
+    else listType
+
+    where listNum = number nListNum
+        
+          nestedType [] = []
+          nestedType (nesN:ns)
+            | nesN >= 0 && nesN < 10 = toEnum nesN : nestedType ns
+            | otherwise = TypeVoid : nestedType ns
+
+          listType = nestedType listNum
 
 
-typeToFigureInt :: [TypeTag] -> [Int]
-typeToFigureInt [] = []
-typeToFigureInt (t:ts)
-    | curFigure < 10 = curFigure : typeToFigureInt ts
-    | otherwise = typeToFigureInt ts
+typeToFigureInt :: [TypeTag] -> Number [Int]
+typeToFigureInt [] = NumberNatural []
+typeToFigureInt (TypeNegative:ts) = NumberNegative $ nestedFigure ts
+typeToFigureInt tts = NumberNatural $ nestedFigure tts
+
+nestedFigure :: [TypeTag] -> [Int]
+nestedFigure [] = []    
+nestedFigure (t:ts)
+    | curFigure < 10 = curFigure : nestedFigure ts
+    | otherwise = nestedFigure ts
 
     where curFigure = fromEnum t
 
@@ -207,12 +251,13 @@ typeToSet (EditRangeRows nes dir (Left (TypeList myType@[TypePair (TypeInt _) (T
     where typeList = (fmap right . sortTypeList) myType
           [TypeList firstI, TypeList secondI] = typeList
 
-typeToSet r | isRightInSet r = Just r
-typeToSet _ = Nothing
+typeToSet r
+    | isRightInSet r = Just r
+    | otherwise = Nothing
 
 
 funcFromI :: Int -> [TypeTag]
-funcFromI i = fmap figureIntToType $ numInRows i
+funcFromI i = figureIntToType $ numInRows i
 
 funcToI :: [TypeTag] -> Int
 funcToI tl = rowsInNum $ typeToFigureInt tl

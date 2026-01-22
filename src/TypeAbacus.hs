@@ -34,6 +34,11 @@ data Graph a
     | GraphVertical [Graph a]
     deriving Show
 
+data Number a
+    = NumberNatural {number :: a}
+    | NumberNegative {number :: a}
+    deriving (Show, Eq, Ord)
+
 instance Eq RowAbacus where
     RowAbacus leftLower leftUpper == RowAbacus rightLower rightUpper
         | (leftLower == rightLower) && (leftUpper == rightUpper) = True
@@ -58,7 +63,7 @@ data TypeTag = Sum0
     | Sum81 | Sum82 | Sum83 | Sum84 | Sum85 | Sum86 | Sum87 | Sum88 | Sum89 | Sum90
     | Sum91 | Sum92 | Sum93 | Sum94 | Sum95 | Sum96 | Sum97 | Sum98 | Sum99 | Sum100
 
-    | Negative
+    | TypeNegative
 
     | TypeVoid
     | TypeBool {bool :: Bool}
@@ -191,3 +196,11 @@ fromThirdLeft (ThirdLeft a) = a
 
 fromThirdRight :: Third a b -> b
 fromThirdRight (ThirdRight b) = b
+
+isNatural :: Number a -> Bool
+isNatural (NumberNatural _) = True
+isNatural _ = False
+
+isNegative :: Number a -> Bool
+isNegative (NumberNegative _) = True
+isNegative _ = False

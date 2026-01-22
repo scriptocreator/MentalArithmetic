@@ -195,9 +195,14 @@ subst el log (x:xs) = x : subst el log xs
 
 
 move :: Bool -> (a -> Bool) -> [a] -> [a]
-move direct logElem l = snd $ nestedMove Nothing l
+move direct logElem l = if isJust mElemMove
+    then elemMove : list
+    else list
 
-    where nestedMove (Just oldX) [] = (Nothing, [oldX])
+    where (mElemMove, list) = nestedMove Nothing l
+          elemMove = fromJust mElemMove
+        
+          nestedMove (Just oldX) [] = (Nothing, [oldX])
           nestedMove _ [] = (Nothing, [])
           nestedMove (Just oldX) (x:xs) = (Nothing, x : oldX : xs)
           nestedMove _ (x:xs)
@@ -211,5 +216,5 @@ move direct logElem l = snd $ nestedMove Nothing l
                     futureX = fromJust mFutureX
                 in if isJust mFutureX
                     then (Nothing, futureX : x : futureXS)
-                    else (Nothing, x : xs)
+                    else (Nothing, x : futureXS)
  

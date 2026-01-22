@@ -18,8 +18,8 @@ import Data.Tuple.Extra
 
 
 
-horiz = 1920 :: Int
-vert = 1040 :: Int
+horiz = 1500 :: Int
+vert = 800 :: Int
 
 halfHoriz :: Int
 halfHoriz = horiz `div` 2
@@ -36,7 +36,8 @@ initWorld gen
 picture :: World -> Picture
 picture (EditSettings sets :\^/ App _ _ _ indent mCarrSet) = pictures allPicturies
 
-    where graphs = fmap setToGraph sets
+    where sortSets = sortSetList sets
+          graphs = fmap setToGraph sortSets
           (allPicturies, _) = foldl
             (outputSettings Vertical funcVert indent)
             ([], (0, 0)) -- (fromIntegral (-halfHoriz), fromIntegral halfVert))
@@ -67,28 +68,43 @@ outputSettings :: Direct
                -> ([Picture], (Float, Float))
                -> Graph String
                -> ([Picture], (Float, Float))
-outputSettings dir f indentDirect (oldSet, curDirect@(curHoriz, curVert)) (GraphElement string)
-    = let futureDirect = f indentDirect curDirect
+
+outputSettings dir f baseDirect (oldSet, curDirect@(curHoriz, curVert)) (GraphElement string)
+    = let futureDirect = f baseDirect curDirect
     in (oldSet ++ [pictures [Translate curHoriz curVert $ Color black $ Text string]], futureDirect)
 
-outputSettings dir f indentDirect (oldSet, curDirect) (GraphHorizontal graphs)
-    = let nesDirect = if isHoriz dir
-            then (fst curDirect, snd curDirect - thd3 indentDirect)
-            else curDirect
-    in foldl (outputSettings Horizontal funcHoriz indentDirect) ([], nesDirect) graphs
+outputSettings dir f baseDirect (oldSet, curDirect) (GraphHorizontal graphs) = (allSet, posDirect)
 
-outputSettings dir f indentDirect (oldSet, curDirect) (GraphVertical graphs)
-    = let nesDirect = if isVert dir
-            then (fst curDirect + thd3 indentDirect, snd curDirect)
+    where indentDirect = if isHoriz dir
+            then (fst curDirect, snd curDirect - thd3 baseDirect)
             else curDirect
-    in foldl (outputSettings Vertical funcVert indentDirect) ([], nesDirect) graphs
+
+          (futureSet, futureDirect) = foldl (outputSettings Horizontal funcHoriz baseDirect) ([], indentDirect) graphs
+          allSet = oldSet ++ futureSet
+          dumpDirect = if isHoriz dir
+            then (fst futureDirect, snd curDirect)
+            else (fst curDirect, snd futureDirect)
+          posDirect = f baseDirect dumpDirect
+
+outputSettings dir f baseDirect (oldSet, curDirect) (GraphVertical graphs) = (allSet, posDirect)
+
+    where indentDirect = if isVert dir
+            then (fst curDirect + thd3 baseDirect, snd curDirect)
+            else curDirect
+          
+          (futureSet, futureDirect) = foldl (outputSettings Vertical funcVert baseDirect) ([], indentDirect) graphs
+          allSet = oldSet ++ futureSet
+          dumpDirect = if isVert dir
+            then (fst curDirect, snd futureDirect)
+            else (fst futureDirect, snd curDirect)
+          posDirect = f baseDirect dumpDirect
 
 
 funcHoriz :: (Float, Float, Float) -> (Float, Float) -> (Float, Float)
-funcHoriz (_, baseVert, _) (horiz, _) = (horiz, baseVert)
+funcHoriz (baseHoriz, _, _) (horiz, vert) = (horiz + baseHoriz, vert)
 
 funcVert :: (Float, Float, Float) -> (Float, Float) -> (Float, Float)
-funcVert (baseHoriz, _, _) (_, vert) = (baseHoriz, vert)
+funcVert (_, baseVert, _) (horiz, vert) = (horiz, vert - baseVert)
 
 
 handleKey :: Event -> World -> World
@@ -147,7 +163,7 @@ handleKey (EventKey (SpecialKey specKey) Down _ _) world@(EditSettings _ :\^/ _)
 
 
 handleKey (EventKey (Char key) Down _ _) world@(EditSettings _ :\^/ _)
-    | key `elem` ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'] = inputData numType world
+    | key `elem` ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-'] = inputData numType world
     | otherwise = world
 
     where numType = figureCharToType key
@@ -199,7 +215,7 @@ multiDirect key world@(EditSettings listEffSet :\^/ app)
                (case mathDirKey Vertical key of
                 LT -> Nothing -- Ничего не делаю
                 EQ -> return (funcPutEdit s (TypeInt futureInt) : tailListEffSet) -- Переключаю theme
-                GT -> Nothing ) $ -- Ничего не делаю -- Ничего не делаю
+                GT -> Nothing) $ -- Ничего не делаю
         funcIf (isNothing mMarker || not (bool marker))
                (case mathDirKey Vertical key of
                 LT -> Nothing -- Ничего не делаю
@@ -208,7 +224,7 @@ multiDirect key world@(EditSettings listEffSet :\^/ app)
                              (return (findSet : freeListMSet))
                              (return (futureSet : listEffSet))
                 GT -> return (funcPutEdit s (returnL $ inliningMarker listFromTypeLeft) : tailListEffSet)) -- Ставлю маркер
-               (case mathDirKey Vertical key of
+               (case mathDirKey Horizontal key of
                 LT -> return (funcPutEdit s (returnL $ offMarker listFromTypeLeft) : tailListEffSet) -- Отключаю маркер
                 EQ -> return (funcPutEdit s (returnL $ moveMarker listFromTypeLeft) : tailListEffSet) -- Перемещаю маркер
                 GT -> Nothing) -- Ничего не делаю
@@ -236,9 +252,9 @@ multiDirect key world@(EditSettings listEffSet :\^/ app)
             then setToType headListEffSet
             else headListEffSet
           tTypeFromLeft = funcGetEdit headSet
-          typeFromLeft init = if tTypeFromLeft == TypeVoid
-            then init
-            else tTypeFromLeft
+          typeFromLeft init = case tTypeFromLeft of
+            TypeList _ -> tTypeFromLeft
+            _ -> init
           initList = TypeList []
           typeListFromLeft = typeFromLeft initList
           listFromTypeLeft = list typeListFromLeft
@@ -246,7 +262,8 @@ multiDirect key world@(EditSettings listEffSet :\^/ app)
           funcWorld Nothing = EditSettings listEffSet :\^/ app
           funcWorld (Just newListSet) = EditSettings newListSet :\^/ app
 
-          futureInt = (toEnum . fromEnum . funcDir . enumSet) headListEffSet
+          futureInt :: Int
+          futureInt = ((fromEnum :: Theme -> Int) . toEnum . funcDir . enumSet) headListEffSet
 
           offMarker = subst (TypeBool False) isTypeBool
           moveMarker = move (keyInBool key) isTypeBool
@@ -266,7 +283,7 @@ multiDirect key world@(EditSettings listEffSet :\^/ app)
           tListFromType_Multi = right curPair
           listFromType_Multi = list tListFromType_Multi
 
-          futureSet = (toEnum . pred . fromEnum) headListEffSet
+          futureSet = (toEnum . funcDir . fromEnum) headListEffSet
           mFindSet = find (mathElemEditSet futureSet) listEffSet
           findSet = fromJust mFindSet
 
