@@ -15,6 +15,11 @@ import Text.Printf (printf)
 
 
 
+isSetTheme :: EditSet -> Bool
+isSetTheme (EditTheme _) = True
+isSetTheme _ = False
+
+
 setToGraph :: [EditSet] -> [Graph String String]
 setToGraph [] = []
 setToGraph sets = GraphMarker headS : tailS
@@ -26,7 +31,7 @@ unitSetToGraph :: EditSet -> Graph String String
 unitSetToGraph set@(EditTheme {}) =
     let mSet = typeToSet set
         reallySet = fromJust mSet
-        name = nameSet set
+        name = "Theme"
 
     in if isNothing mSet
         then (GraphElement name . show) initTheme
@@ -43,7 +48,7 @@ unitSetToGraph set@(EditRangeRows {}) =
 
     where tlSet = funcGetEdit (setToType set)
           typeList = (fmap right . sortTypeList . list) tlSet
-          stringsArgs = fmap (GraphElement "" . typeToString . list) typeList
+          stringsArgs = fmap (GraphElement "arg" . typeToString . list) typeList
 
 unitSetToGraph set =
     let typeTag = funcGetEdit (setToType set)

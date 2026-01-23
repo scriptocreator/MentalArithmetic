@@ -27,10 +27,13 @@ halfHoriz = horiz `div` 2
 halfVert :: Int
 halfVert = vert `div` 2
 
+multi :: Float
+multi = 0.3
+
 initWorld :: StdGen -> World
 initWorld gen
     = EditSettings [EditStartLine (Right $ StartLine (-halfHoriz))]
-    :\^/ App (Expressions []) gen (Carriage 0) (50, 20, 10) (Carriage 0)
+    :\^/ App (Expressions []) gen (Carriage 0) (300, 40, 10) (Carriage 0)
 
 
 picture :: World -> Picture
@@ -46,7 +49,7 @@ picture (EditSettings sets :\^/ App _ _ _ indent mCarrSet) = pictures allPicturi
           newGraphs = fmap snd sortSetGraph
           (allPicturies, _) = foldl
             (outputSettings Vertical funcVert False indent)
-            ([], (0, 0)) -- (fromIntegral (-halfHoriz), fromIntegral halfVert))
+            ([], {-(0, 0))-} (fromIntegral (-halfHoriz), fromIntegral halfVert - snd3 indent))
             newGraphs
 
 picture (App (Expressions exprs) _ _ _ _ :\^/ Settings (StartLine start) (LengthExpr lenExpr) _ _ _) = pictures allPicturies
@@ -80,41 +83,54 @@ outputSettings dir f log base stateFoldl (GraphMarker graph)
     = outputSettings dir f True base stateFoldl graph
 
 outputSettings dir f log baseDirect (oldGraph, curDirect@(curHoriz, curVert)) (GraphElement name string)
-    = let nameDirect@(nameHoriz, nameVert) = funcHoriz baseDirect curDirect
-          futureDirect = f baseDirect nameDirect
-          image = [Translate nameHoriz nameVert $ Scale 0.6 0.6 $ Color (selectColor log) $ Text name
-                  ,Translate curHoriz curVert $ Scale 0.6 0.6 $ Color black $ Text string]
-    
-    in (oldGraph ++ [pictures image], futureDirect)
-
-outputSettings dir f log baseDirect (oldGraph, curDirect) (GraphHorizontal name graphs) = (allGraph, posDirect)
-
-    where nameDirect@(nameHoriz, nameVert) = funcHoriz baseDirect curDirect
-          indentDirect = if isHoriz dir
-            then (fst nameDirect, snd nameDirect - thd3 baseDirect)
-            else nameDirect
-
-          (futureGraph, futureDirect) = foldl (outputSettings Horizontal funcHoriz False baseDirect) ([], indentDirect) graphs
-          curGraph = Translate nameHoriz nameVert $ Scale 0.6 0.6 $ Color (selectColor log) $ Text name
-          allGraph = oldGraph ++ return curGraph ++ futureGraph
+    = let tailDirect@(tailHoriz, tailVert) = funcHoriz baseDirect curDirect
+          futureDirect = f baseDirect tailDirect
           dumpDirect = if isHoriz dir
             then (fst futureDirect, snd curDirect)
             else (fst curDirect, snd futureDirect)
+          image = [Translate curHoriz curVert $ Scale multi multi $ Color (selectColor log) $ Text name
+                  ,Translate tailHoriz tailVert $ Scale multi multi $ Color black $ Text string]
+    
+    in (oldGraph ++ [pictures image], dumpDirect)
+
+outputSettings dir f log baseDirect (oldGraph, curDirect@(curHoriz, curVert)) (GraphHorizontal name graphs)
+    = (allGraph, posDirect)
+
+    where tailDirect@(tailHoriz, tailVert) = funcHoriz baseDirect curDirect
+          indentDirect = if isHoriz dir
+            then (tailHoriz, tailVert - thd3 baseDirect)
+            else tailDirect
+
+          (futureGraph, (futureHoriz, futureVert)) = foldl
+            (outputSettings Horizontal funcHoriz False baseDirect)
+            ([], indentDirect)
+            graphs
+
+          curGraph = Translate curHoriz curVert $ Scale multi multi $ Color (selectColor log) $ Text name
+          allGraph = oldGraph ++ return curGraph ++ futureGraph
+          dumpDirect = if isHoriz dir
+            then (futureHoriz, curVert)
+            else (curHoriz, futureVert)
           posDirect = f baseDirect dumpDirect
 
-outputSettings dir f log baseDirect (oldGraph, curDirect) (GraphVertical name graphs) = (allGraph, posDirect)
+outputSettings dir f log baseDirect (oldGraph, curDirect@(curHoriz, curVert)) (GraphVertical name graphs)
+    = (allGraph, posDirect)
 
-    where nameDirect@(nameHoriz, nameVert) = funcHoriz baseDirect curDirect
+    where tailDirect@(tailHoriz, tailVert) = funcHoriz baseDirect curDirect
           indentDirect = if isVert dir
-            then (fst nameDirect + thd3 baseDirect, snd nameDirect)
-            else nameDirect
+            then (tailHoriz + thd3 baseDirect, tailVert)
+            else tailDirect
           
-          (futureGraph, futureDirect) = foldl (outputSettings Vertical funcVert False baseDirect) ([], indentDirect) graphs
-          curGraph = Translate nameHoriz nameVert $ Scale 0.6 0.6 $ Color (selectColor log) $ Text name
-          allGraph = oldGraph ++ futureGraph
+          (futureGraph, (futureHoriz, futureVert)) = foldl
+            (outputSettings Vertical funcVert False baseDirect)
+            ([], indentDirect)
+            graphs
+
+          curGraph = Translate curHoriz curVert $ Scale multi multi $ Color (selectColor log) $ Text name
+          allGraph = oldGraph ++ return curGraph ++ futureGraph
           dumpDirect = if isVert dir
-            then (fst curDirect, snd futureDirect)
-            else (fst futureDirect, snd curDirect)
+            then (curHoriz, futureVert)
+            else (futureHoriz, curVert)
           posDirect = f baseDirect dumpDirect
 
 
@@ -233,23 +249,20 @@ multiDirect :: SpecialKey -> World -> World
 multiDirect key world@(EditSettings listEffSet :\^/ app)
     | fromEnumArgs headListEffSet == 1
         = funcWorld $
-        funcIf (isTypeInt tTypeFromLeft)
-               (case mathDirKey Vertical key of
-                LT -> Nothing -- Ничего не делаю
-                EQ -> return (funcPutEdit s (TypeInt futureInt) : tailListEffSet) -- Переключаю theme
-                GT -> Nothing) $ -- Ничего не делаю
-        funcIf (isNothing mMarker || not (bool marker))
-               (case mathDirKey Vertical key of
-                LT -> Nothing -- Ничего не делаю
-                EQ -> funcIf (futureSet == EditSetVoid) Nothing $ -- Меняю элемент Set
-                      funcIf (isJust mFindSet)
-                             (return (findSet : freeListMSet))
-                             (return (futureSet : listEffSet))
-                GT -> return (funcPutEdit s (returnL $ inliningMarker listFromTypeLeft) : tailListEffSet)) -- Ставлю маркер
-               (case mathDirKey Horizontal key of
-                LT -> return (funcPutEdit s (returnL $ offMarker listFromTypeLeft) : tailListEffSet) -- Отключаю маркер
-                EQ -> return (funcPutEdit s (returnL $ moveMarker listFromTypeLeft) : tailListEffSet) -- Перемещаю маркер
-                GT -> Nothing) -- Ничего не делаю
+        funcIf  (isSetTheme headListEffSet)
+                (case mathDirKey Horizontal key of
+                    LT -> swithSet -- Меняю элемент Set
+                    EQ -> return (funcPutEdit s (TypeInt futureInt) : tailListEffSet) -- Переключаю theme
+                    GT -> swithSet) $ -- Меняю элемент Set
+        funcIf  (isNothing mMarker || not (bool marker))
+                (case mathDirKey Vertical key of
+                    LT -> Nothing -- Ничего не делаю
+                    EQ -> swithSet -- Меняю элемент Set
+                    GT -> return (funcPutEdit s (returnL $ inliningMarker listFromTypeLeft) : tailListEffSet)) -- Ставлю маркер
+                (case mathDirKey Horizontal key of
+                    LT -> return (funcPutEdit s (returnL $ offMarker listFromTypeLeft) : tailListEffSet) -- Отключаю маркер
+                    EQ -> return (funcPutEdit s (returnL $ moveMarker listFromTypeLeft) : tailListEffSet) -- Перемещаю маркер
+                    GT -> Nothing) -- Ничего не делаю
     | fromEnumArgs headListEffSet > 1 && nested headListEffSet
         = funcWorld $ if isNothing mMarker || not (bool marker)
             then case mathDirKey dir key of
@@ -276,16 +289,25 @@ multiDirect key world@(EditSettings listEffSet :\^/ app)
           tTypeFromLeft = funcGetEdit headSet
           typeFromLeft init = case tTypeFromLeft of
             TypeList _ -> tTypeFromLeft
+            TypeInt _ -> tTypeFromLeft
             _ -> init
           initList = TypeList []
+          initInt = TypeInt 0
+          typeIntFromLeft = typeFromLeft initInt
           typeListFromLeft = typeFromLeft initList
           listFromTypeLeft = list typeListFromLeft
           funcDir = if key `elem` [KeyLeft, KeyUp] then pred else succ
           funcWorld Nothing = EditSettings listEffSet :\^/ app
           funcWorld (Just newListSet) = EditSettings newListSet :\^/ app
+          swithSet =
+            funcIf  (futureSet == EditSetVoid) Nothing $
+            funcIf  (isJust mFindSet)
+                    (return (findSet : freeListMSet))
+                    (return (futureSet : listEffSet))
 
+          interimTheme = headListEffSet {editTheme = Left typeIntFromLeft}
           futureInt :: Int
-          futureInt = ((fromEnum :: Theme -> Int) . toEnum . funcDir . enumSet) headListEffSet
+          futureInt = ((fromEnum :: Theme -> Int) . toEnum . funcDir . enumSet . fromJust . typeToSet) interimTheme
 
           offMarker = subst (TypeBool False) isTypeBool
           moveMarker = move (keyInBool key) isTypeBool
