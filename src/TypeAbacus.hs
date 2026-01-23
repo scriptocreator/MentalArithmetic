@@ -28,10 +28,11 @@ data Done = Done deriving (Show, Eq, Ord)
 
 data Direct = Horizontal | Vertical deriving (Show, Eq, Ord)
 
-data Graph a
-    = GraphElement a
-    | GraphHorizontal [Graph a]
-    | GraphVertical [Graph a]
+data Graph a b
+    = GraphElement {name :: a, element :: b}
+    | GraphHorizontal {name :: a, graph :: [Graph a b]}
+    | GraphVertical {name :: a, graph :: [Graph a b]}
+    | GraphMarker (Graph a b)
     deriving Show
 
 data Number a

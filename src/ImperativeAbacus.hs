@@ -15,30 +15,54 @@ import Text.Printf (printf)
 
 
 
-setToGraph :: EditSet -> Graph String
-setToGraph set@(EditTheme {}) =
+setToGraph :: [EditSet] -> [Graph String String]
+setToGraph [] = []
+setToGraph sets = GraphMarker headS : tailS
+
+    where (headS:tailS) = fmap unitSetToGraph sets
+
+
+unitSetToGraph :: EditSet -> Graph String String
+unitSetToGraph set@(EditTheme {}) =
     let mSet = typeToSet set
         reallySet = fromJust mSet
-    in if isNothing mSet
-        then (GraphElement . show) initTheme
-        else (GraphElement . show . fromRight ThemeVoid . editTheme) reallySet
+        name = nameSet set
 
-setToGraph set@(EditRangeRows {}) = 
+    in if isNothing mSet
+        then (GraphElement name . show) initTheme
+        else (GraphElement name . show . fromRight ThemeVoid . editTheme) reallySet
+
+unitSetToGraph set@(EditRangeRows {}) =
     let dir = direct set
-    in funcIf (tlSet == TypeVoid) (GraphElement "") $
+        name = nameSet set
+
+    in funcIf (tlSet == TypeVoid) (GraphElement name "") $
        funcIf (isHoriz dir)
-              (GraphHorizontal stringsArgs)
-              (GraphVertical stringsArgs)
-    
+              (GraphHorizontal name stringsArgs)
+              (GraphVertical name stringsArgs)
+
     where tlSet = funcGetEdit (setToType set)
           typeList = (fmap right . sortTypeList . list) tlSet
-          stringsArgs = fmap (GraphElement . typeToString . list) typeList
+          stringsArgs = fmap (GraphElement "" . typeToString . list) typeList
 
-setToGraph set
-    = let typeTag = funcGetEdit (setToType set)
+unitSetToGraph set =
+    let typeTag = funcGetEdit (setToType set)
+        name = nameSet set
+
     in if typeTag == TypeVoid
-        then GraphElement ""
-        else (GraphElement . typeToString . list) typeTag
+        then GraphElement name ""
+        else (GraphElement name . typeToString . list) typeTag
+
+
+nameSet :: EditSet -> String
+nameSet set =
+    let mSet = typeToSet set
+        updSet = fromJust mSet
+        compSet = head . words . showEditSet
+        
+    in if isJust mSet
+        then compSet updSet
+        else compSet $ initRightSet set
 
 
 typeToString :: [TypeTag] -> String
@@ -50,28 +74,29 @@ typeToString (t:ts)
     | otherwise = typeToString ts
 
 
-sortSetList :: [EditSet] -> [EditSet]
-sortSetList = nestedSort []
-
-    where nestedSort :: [(Int, EditSet)] -> [EditSet] -> [EditSet]
-          nestedSort sortList [] = fmap snd sortList
-          nestedSort sortList (s:ss) = 
-            let sortS = (fromEnum s, s)
-            in nestedSort (putSetList sortS sortList) ss
+sortSetGraphList :: [(EditSet, Graph String String)] -> [(EditSet, Graph String String)]
+sortSetGraphList = sortUnitList ((fromEnum :: EditSet -> Int) . fst)
 
 
-putSetList :: (Int, EditSet) -> [(Int, EditSet)] -> [(Int, EditSet)]
-putSetList s [] = [s]
-putSetList s (sel:ss)
-    | fst s == fst sel
-        = error $ printf "Error ImperativeAbacus №1: Обнаружена ещё одна переменная под аргумент конструктора – «%s» и «%s»"
-                         (show arg1)
-                         (show arg2)
-    | fst s < fst sel = s : sel : ss
-    | otherwise = sel : putSetList s ss
+sortUnitList :: Show a => (a -> Int) -> [a] -> [a]
+sortUnitList fromA = nestedSort []
 
-    where arg1 = snd s
-          arg2 = snd sel 
+    where nestedSort sortList [] = fmap snd sortList
+          nestedSort sortList (u:us) =
+            let sortU = (fromA u, u)
+            in nestedSort (putUnitList sortU sortList) us
+
+          putUnitList s [] = [s]
+          putUnitList s (sel:ss)
+            | fst s == fst sel
+                = error $ printf "Error ImperativeAbacus №1: Обнаружена ещё одна переменная под аргумент конструктора – «%s» и «%s»"
+                                 (show arg1)
+                                 (show arg2)
+            | fst s < fst sel = s : sel : ss
+            | otherwise = sel : putUnitList s ss
+
+            where arg1 = snd s
+                  arg2 = snd sel
 
 
 funcGetEdit :: EditSet -> TypeTag
@@ -106,7 +131,7 @@ numInRows num = if num < 0
             where tupleRow = (newRow, rowSimula)
                   newRow = rowSimula * 10
                   newNumSimula = exponent numSimula
-                  
+
           createRows [] = []
           createRows ((modRow, divRow):rows)
             = absNum `mod` modRow `div` divRow : createRows rows
@@ -171,7 +196,7 @@ figureIntToType nListNum = if isNegative nListNum
     else listType
 
     where listNum = number nListNum
-        
+
           nestedType [] = []
           nestedType (nesN:ns)
             | nesN >= 0 && nesN < 10 = toEnum nesN : nestedType ns
@@ -186,7 +211,7 @@ typeToFigureInt (TypeNegative:ts) = NumberNegative $ nestedFigure ts
 typeToFigureInt tts = NumberNatural $ nestedFigure tts
 
 nestedFigure :: [TypeTag] -> [Int]
-nestedFigure [] = []    
+nestedFigure [] = []
 nestedFigure (t:ts)
     | curFigure < 10 = curFigure : nestedFigure ts
     | otherwise = nestedFigure ts
@@ -201,6 +226,14 @@ mathDirKey Horizontal _ = EQ
 mathDirKey Vertical KeyLeft = LT
 mathDirKey Vertical KeyRight = GT
 mathDirKey Vertical _ = EQ
+
+
+showEditSet :: EditSet -> String
+showEditSet (EditStartLine (Right e)) = show e
+showEditSet (EditLengthExpr (Right e)) = show e
+showEditSet (EditQuantityQuestion (Right e)) = show e
+showEditSet (EditTheme (Right e)) = show e
+showEditSet (EditRangeRows _ _ (Right e)) = show e
 
 
 enumArgsSet :: EditSet -> Int
@@ -312,6 +345,7 @@ powerInAbacus gen (numLower, numUpper) = (RowAbacus newLower newUpper, finalGen)
           (newUpper, finalGen) =
             let (num, secondGen) = randomR (0, numUpper) firstGen
                 curUpper = num /= 0
+                
             in if numUpper == 0
                 then (False, firstGen)
                 else (curUpper, secondGen)

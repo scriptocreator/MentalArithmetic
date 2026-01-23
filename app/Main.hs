@@ -36,12 +36,18 @@ initWorld gen
 picture :: World -> Picture
 picture (EditSettings sets :\^/ App _ _ _ indent mCarrSet) = pictures allPicturies
 
-    where sortSets = sortSetList sets
-          graphs = fmap setToGraph sortSets
+    where graphs = setToGraph sets
+          zipSetGraph = zip sets graphs
+          unitZip =
+            let (headZ:tailZ) = zipSetGraph
+                (setZ, graphZ) = headZ
+            in (setZ, GraphMarker graphZ) : tailZ
+          sortSetGraph = sortSetGraphList unitZip
+          newGraphs = fmap snd sortSetGraph
           (allPicturies, _) = foldl
-            (outputSettings Vertical funcVert indent)
+            (outputSettings Vertical funcVert False indent)
             ([], (0, 0)) -- (fromIntegral (-halfHoriz), fromIntegral halfVert))
-            graphs
+            newGraphs
 
 picture (App (Expressions exprs) _ _ _ _ :\^/ Settings (StartLine start) (LengthExpr lenExpr) _ _ _) = pictures allPicturies
 
@@ -64,36 +70,48 @@ outputAbacusis (current, predPictures) (str:ss)
 
 outputSettings :: Direct
                -> ((Float, Float, Float) -> (Float, Float) -> (Float, Float))
+               -> Bool
                -> (Float, Float, Float)
                -> ([Picture], (Float, Float))
-               -> Graph String
+               -> Graph String String
                -> ([Picture], (Float, Float))
 
-outputSettings dir f baseDirect (oldSet, curDirect@(curHoriz, curVert)) (GraphElement string)
-    = let futureDirect = f baseDirect curDirect
-    in (oldSet ++ [pictures [Translate curHoriz curVert $ Color black $ Text string]], futureDirect)
+outputSettings dir f log base stateFoldl (GraphMarker graph)
+    = outputSettings dir f True base stateFoldl graph
 
-outputSettings dir f baseDirect (oldSet, curDirect) (GraphHorizontal graphs) = (allSet, posDirect)
+outputSettings dir f log baseDirect (oldGraph, curDirect@(curHoriz, curVert)) (GraphElement name string)
+    = let nameDirect@(nameHoriz, nameVert) = funcHoriz baseDirect curDirect
+          futureDirect = f baseDirect nameDirect
+          image = [Translate nameHoriz nameVert $ Scale 0.6 0.6 $ Color (selectColor log) $ Text name
+                  ,Translate curHoriz curVert $ Scale 0.6 0.6 $ Color black $ Text string]
+    
+    in (oldGraph ++ [pictures image], futureDirect)
 
-    where indentDirect = if isHoriz dir
-            then (fst curDirect, snd curDirect - thd3 baseDirect)
-            else curDirect
+outputSettings dir f log baseDirect (oldGraph, curDirect) (GraphHorizontal name graphs) = (allGraph, posDirect)
 
-          (futureSet, futureDirect) = foldl (outputSettings Horizontal funcHoriz baseDirect) ([], indentDirect) graphs
-          allSet = oldSet ++ futureSet
+    where nameDirect@(nameHoriz, nameVert) = funcHoriz baseDirect curDirect
+          indentDirect = if isHoriz dir
+            then (fst nameDirect, snd nameDirect - thd3 baseDirect)
+            else nameDirect
+
+          (futureGraph, futureDirect) = foldl (outputSettings Horizontal funcHoriz False baseDirect) ([], indentDirect) graphs
+          curGraph = Translate nameHoriz nameVert $ Scale 0.6 0.6 $ Color (selectColor log) $ Text name
+          allGraph = oldGraph ++ return curGraph ++ futureGraph
           dumpDirect = if isHoriz dir
             then (fst futureDirect, snd curDirect)
             else (fst curDirect, snd futureDirect)
           posDirect = f baseDirect dumpDirect
 
-outputSettings dir f baseDirect (oldSet, curDirect) (GraphVertical graphs) = (allSet, posDirect)
+outputSettings dir f log baseDirect (oldGraph, curDirect) (GraphVertical name graphs) = (allGraph, posDirect)
 
-    where indentDirect = if isVert dir
-            then (fst curDirect + thd3 baseDirect, snd curDirect)
-            else curDirect
+    where nameDirect@(nameHoriz, nameVert) = funcHoriz baseDirect curDirect
+          indentDirect = if isVert dir
+            then (fst nameDirect + thd3 baseDirect, snd nameDirect)
+            else nameDirect
           
-          (futureSet, futureDirect) = foldl (outputSettings Vertical funcVert baseDirect) ([], indentDirect) graphs
-          allSet = oldSet ++ futureSet
+          (futureGraph, futureDirect) = foldl (outputSettings Vertical funcVert False baseDirect) ([], indentDirect) graphs
+          curGraph = Translate nameHoriz nameVert $ Scale 0.6 0.6 $ Color (selectColor log) $ Text name
+          allGraph = oldGraph ++ futureGraph
           dumpDirect = if isVert dir
             then (fst curDirect, snd futureDirect)
             else (fst futureDirect, snd curDirect)
@@ -105,6 +123,10 @@ funcHoriz (baseHoriz, _, _) (horiz, vert) = (horiz + baseHoriz, vert)
 
 funcVert :: (Float, Float, Float) -> (Float, Float) -> (Float, Float)
 funcVert (_, baseVert, _) (horiz, vert) = (horiz, vert - baseVert)
+
+selectColor :: Bool -> Color
+selectColor False = blue
+selectColor True = red
 
 
 handleKey :: Event -> World -> World
