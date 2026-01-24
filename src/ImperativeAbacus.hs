@@ -12,12 +12,8 @@ import Data.Maybe (fromJust, isJust, isNothing)
 import Graphics.Gloss.Interface.Pure.Game
 import Data.Either ( fromLeft, fromRight )
 import Text.Printf (printf)
+import Data.List (find)
 
-
-
-isSetTheme :: EditSet -> Bool
-isSetTheme (EditTheme _) = True
-isSetTheme _ = False
 
 
 setToGraph :: [EditSet] -> [Graph String String]
@@ -41,14 +37,26 @@ unitSetToGraph set@(EditRangeRows {}) =
     let dir = direct set
         name = nameSet set
 
-    in funcIf (tlSet == TypeVoid) (GraphElement name "") $
+    in --funcIf True (GraphElement name (show set)) $
+       funcIf (tlSet == TypeVoid) (GraphElement name "") $
        funcIf (isHoriz dir)
-              (GraphHorizontal name stringsArgs)
-              (GraphVertical name stringsArgs)
+              (GraphHorizontal name graphStringsArgs)
+              (GraphVertical name graphStringsArgs)
 
     where tlSet = funcGetEdit (setToType set)
-          typeList = (fmap right . sortTypeList . list) tlSet
-          stringsArgs = fmap (GraphElement "arg" . typeToString . list) typeList
+          
+          (headTypeList:tailTypeList) = list tlSet
+          eitListWithMarker = UnitRight headTypeList : fmap UnitLeft tailTypeList
+          sortEitList = sortUnitList () lambdaEitGraph eitListWithMarker
+          graphStringsArgs = fmap fromUnit sortEitList
+
+          fromUnit (UnitRight t) = (GraphMarker . funcTypeNumToString . right) t
+          fromUnit t = (funcTypeNumToString . right . unit) t
+
+          element = GraphElement "arg"
+
+          funcTypeNumToString TypeVoid = element ""
+          funcTypeNumToString tNum@(TypeList l) = (element . typeNumToString . list) tNum
 
 unitSetToGraph set =
     let typeTag = funcGetEdit (setToType set)
@@ -56,7 +64,11 @@ unitSetToGraph set =
 
     in if typeTag == TypeVoid
         then GraphElement name ""
-        else (GraphElement name . typeToString . list) typeTag
+        else (GraphElement name . typeNumToString . list) typeTag
+
+
+lambdaEitGraph :: () -> UnitEither TypeTag -> ((), Int)
+lambdaEitGraph _ u = ((), int $ left $ unit u)
 
 
 nameSet :: EditSet -> String
@@ -70,26 +82,32 @@ nameSet set =
         else compSet $ initRightSet set
 
 
-typeToString :: [TypeTag] -> String
-typeToString [] = []
-typeToString (TypeNegative:ts) = '-' : typeToString ts
-typeToString (t:ts)
-    | fromEnum t < 10 = (show . fromEnum) t ++ typeToString ts
-    | isTypeBool t && bool t = '|' : typeToString ts
-    | otherwise = typeToString ts
+typeNumToString :: [TypeTag] -> String
+typeNumToString [] = []
+typeNumToString (TypeNegative:ts) = '-' : typeNumToString ts
+typeNumToString (t:ts)
+    | fromEnum t < 10 = (show . fromEnum) t ++ typeNumToString ts
+    | isTypeBool t && bool t = '|' : typeNumToString ts
+    | otherwise = typeNumToString ts
 
 
 sortSetGraphList :: [(EditSet, Graph String String)] -> [(EditSet, Graph String String)]
-sortSetGraphList = sortUnitList ((fromEnum :: EditSet -> Int) . fst)
+sortSetGraphList = sortUnitList () lambdaGraph
+
+lambdaGraph :: () -> (EditSet, b) -> ((), Int)
+lambdaGraph _ tuple = 
+    let lambda = (fromEnum :: EditSet -> Int) . fst
+    in ((), lambda tuple)
 
 
-sortUnitList :: Show a => (a -> Int) -> [a] -> [a]
-sortUnitList fromA = nestedSort []
+sortUnitList :: Show a => c -> (c -> a -> (c, Int)) -> [a] -> [a]
+sortUnitList c fromA = nestedSort c []
 
-    where nestedSort sortList [] = fmap snd sortList
-          nestedSort sortList (u:us) =
-            let sortU = (fromA u, u)
-            in nestedSort (putUnitList sortU sortList) us
+    where nestedSort c sortList [] = fmap snd sortList
+          nestedSort c sortList (u:us) =
+            let (newC, numU) = fromA c u
+                sortU = (numU, u)
+            in nestedSort newC (putUnitList sortU sortList) us
 
           putUnitList s [] = [s]
           putUnitList s (sel:ss)
@@ -255,6 +273,16 @@ enumSet (EditLengthExpr (Right e)) = fromEnum e
 enumSet (EditQuantityQuestion (Right e)) = fromEnum e
 enumSet (EditTheme (Right e)) = fromEnum e
 enumSet (EditRangeRows _ _ (Right e)) = fromEnum e
+
+
+replicateRightSet :: EditSet -> EditSet
+replicateRightSet (EditStartLine {}) = EditStartLine $ Right initStartLine
+replicateRightSet (EditLengthExpr {}) = EditLengthExpr $ Right initLengthExpr
+replicateRightSet (EditQuantityQuestion {}) = EditQuantityQuestion $ Right initQuantityQuestion
+replicateRightSet (EditTheme (Right right)) = EditTheme $ Right right
+replicateRightSet (EditTheme (Left TypeVoid)) = EditTheme $ Right initTheme
+replicateRightSet (EditTheme (Left (TypeInt int))) = EditTheme $ Right $ toEnum int
+replicateRightSet (EditRangeRows {}) = EditRangeRows False Horizontal $ Right initRangeRows
 
 
 initRightSet :: EditSet -> EditSet

@@ -8,6 +8,11 @@ infixr 6 :#*
 infixr 6 :#+
 
 
+data UnitEither a
+    = UnitLeft {unit :: a}
+    | UnitRight {unit :: a}
+    deriving (Show, Eq, Ord)
+
 data Third a b
     = ThirdNothing
     | ThirdLeft a
