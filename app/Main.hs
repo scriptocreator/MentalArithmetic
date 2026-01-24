@@ -195,7 +195,7 @@ handleKey (EventKey (SpecialKey KeyCtrlL) Down _ _) (app :\^/ Settings start len
                         ,EditRangeRows False Horizontal (Right range)]
 
 -- `KeyBackspace` почему-то не работет
-handleKey (EventKey (SpecialKey KeyInsert) Down _ _) world@(EditSettings sets :\^/ app)
+handleKey (EventKey (SpecialKey KeyDelete) Down _ _) world@(EditSettings sets :\^/ app)
     -- | True = WorldVoid
     | isJust mNewSet = EditSettings newSets :\^/ app
     | otherwise = world
@@ -205,8 +205,8 @@ handleKey (EventKey (SpecialKey KeyInsert) Down _ _) world@(EditSettings sets :\
           newSet = fromJust mNewSet
           newSets = newSet : tailSets
 
-
-handleKey (EventKey (SpecialKey KeyDelete) Down _ _) world@(EditSettings sets :\^/ app)
+-- Вместо `KeyDelete` использую `KeyInsert`, для удобства
+handleKey (EventKey (SpecialKey KeyInsert) Down _ _) world@(EditSettings sets :\^/ app)
     | isJust mNewSet = EditSettings newSets :\^/ app
     | otherwise = world
     

@@ -360,7 +360,7 @@ sortEditApp = nestedSort Nothing Nothing Nothing
 sortEditSet :: [EditSet] -> Maybe [EditSet]
 sortEditSet = nestedSort Nothing Nothing Nothing Nothing Nothing
 
-    where nestedSort (Just start) (Just lenExpr) (Just quant) (Just theme) (Just range) [] = return [start, lenExpr, quant, theme, range, range]
+    where nestedSort (Just start) (Just lenExpr) (Just quant) (Just theme) (Just range) [] = return [start, lenExpr, quant, theme, range]
           nestedSort start lenExpr quant theme range (x@(EditStartLine {}):xs)        = nestedSort (return x) lenExpr quant theme range xs
           nestedSort start lenExpr quant theme range (x@(EditLengthExpr {}):xs)       = nestedSort start (return x) quant theme range xs
           nestedSort start lenExpr quant theme range (x@(EditQuantityQuestion {}):xs) = nestedSort start lenExpr (return x) theme range xs
