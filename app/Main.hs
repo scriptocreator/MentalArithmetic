@@ -194,6 +194,27 @@ handleKey (EventKey (SpecialKey KeyCtrlL) Down _ _) (app :\^/ Settings start len
                         ,EditTheme (Right theme)
                         ,EditRangeRows False Horizontal (Right range)]
 
+-- `KeyBackspace` почему-то не работет
+handleKey (EventKey (SpecialKey KeyInsert) Down _ _) world@(EditSettings sets :\^/ app)
+    -- | True = WorldVoid
+    | isJust mNewSet = EditSettings newSets :\^/ app
+    | otherwise = world
+    
+    where (headSet:tailSets) = sets
+          mNewSet = deleteData False headSet
+          newSet = fromJust mNewSet
+          newSets = newSet : tailSets
+
+
+handleKey (EventKey (SpecialKey KeyDelete) Down _ _) world@(EditSettings sets :\^/ app)
+    | isJust mNewSet = EditSettings newSets :\^/ app
+    | otherwise = world
+    
+    where (headSet:tailSets) = sets
+          mNewSet = deleteData True headSet
+          newSet = fromJust mNewSet
+          newSets = newSet : tailSets
+
 
 handleKey (EventKey (SpecialKey specKey) Down _ _) world@(EditSettings _ :\^/ _)
     | specKey `elem` [KeyLeft, KeyRight, KeyUp, KeyDown] = multiDirect specKey world
@@ -208,6 +229,30 @@ handleKey (EventKey (Char key) Down _ _) world@(EditSettings _ :\^/ _)
 
 
 handleKey _ world = world
+
+
+deleteData :: Bool -> EditSet -> Maybe EditSet
+deleteData log headSet
+    | nEdit == TypeVoid = Nothing
+    | fromEnumArgs headSet == 1 && not (isTypeInt nEdit) = return newDelOneTypeNum
+    | fromEnumArgs headSet > 1 && nested headSet = return newDelMultiArgSet
+    | otherwise = Nothing
+
+    where setWithLeft = if isRightInSet headSet
+            then setToType headSet
+            else headSet
+          nEdit = funcGetEdit setWithLeft
+          newTypeList n = case n of
+            TypeList listFromType -> TypeList $ cut log isTypeBool listFromType
+            _ -> TypeList [TypeBool True]
+
+          newDelOneTypeNum = funcPutEdit setWithLeft (newTypeList nEdit)
+          
+          newDelMultiArgSet = funcPutEdit setWithLeft $ TypeList (newTypeHeadEdit : typeTailEdit)
+          newTypeHeadEdit = typeHeadEdit {right = newTypeList $ right typeHeadEdit}
+
+          (typeHeadEdit:typeTailEdit) = listFromTypeEdit
+          listFromTypeEdit = list nEdit
 
 
 inputData :: TypeTag -> World -> World

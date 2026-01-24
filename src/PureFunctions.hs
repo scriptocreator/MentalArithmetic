@@ -217,4 +217,24 @@ move direct logElem l = if isJust mElemMove
                 in if isJust mFutureX
                     then (Nothing, futureX : x : futureXS)
                     else (Nothing, x : futureXS)
+
+
+cut :: Bool -> (a -> Bool) -> [a] -> [a]
+cut direct logElem l = list
+
+    where (_, list) = nestedCut False l
+        
+          nestedCut _ [] = (False, [])
+          nestedCut True (_:xs) = (False, xs)
+          nestedCut _ xxs@(x:xs)
+            | logElem x =
+                let (_, futureXS) = nestedCut True xs 
+                in if direct
+                    then (False, x : futureXS)
+                    else (True, xxs)
+            | otherwise =
+                let (futureLog, futureXS) = nestedCut False xs
+                in if futureLog
+                    then (False, futureXS)
+                    else (False, x : futureXS)
  

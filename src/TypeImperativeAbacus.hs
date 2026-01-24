@@ -11,7 +11,8 @@ infixr 6 :\^/
 
 
 data World
-    = EditSettings [EditSet]
+    = WorldVoid
+    | EditSettings [EditSet]
 
     | App Expressions StdGen Carriage (Float, Float, Float) Carriage
     | Settings StartLine LengthExpr QuantityQuestion Theme RangeRows
