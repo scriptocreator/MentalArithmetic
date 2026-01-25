@@ -180,8 +180,10 @@ handleKey (EventKey (SpecialKey KeyCtrlL) Down _ _) world@(EditSettings listEffS
                         let (baseRow, nullGen) = powerInAbacus gen newAbacus
                         in (replicate pureLenExpr baseRow, nullGen)
                       clearBaseAbacus = clearVoidRows baseAbacus
-                      (lazyReadyExpr, secondGen) = rep firstGen
-                      readyExpr = take adjustmentLenExpr lazyReadyExpr
+                      lazyReady = rep firstGen
+                      readyExprGen = take adjustmentLenExpr lazyReady
+                      secondGen = snd $ last readyExprGen
+                      readyExpr = fmap fst readyExprGen
                       (freeBaseAbacus, thirdGen) = abac secondGen clearBaseAbacus readyExpr
                       (futureGenericExpr, finalGen) = (generator thirdGen . pred) n
 

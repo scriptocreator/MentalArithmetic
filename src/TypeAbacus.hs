@@ -56,6 +56,7 @@ instance Eq RowAbacus where
 data Expr
     = Expr {operator :: Bool}
     | ExprBro {operator :: Bool, ifPlus :: Bool} -- Оператор; Для условия функции
+    deriving (Show, Eq)
 
 data TypeTag = Sum0
     | Sum1 | Sum2 | Sum3 | Sum4 | Sum5 | Sum6 | Sum7 | Sum8 | Sum9 | Sum10
