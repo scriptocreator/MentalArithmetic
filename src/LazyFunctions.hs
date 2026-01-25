@@ -6,14 +6,31 @@ import System.Random
 
 
 
-repeatExpr :: StdGen -> [(Expr, StdGen)]
-repeatExpr gen = (curOper, firstGen) : repeatExpr firstGen
+repeatExpr :: StdGen -> Int -> ([Expr], StdGen)
+repeatExpr gen len = (pureLazy, finalGen)
 
+    where pureLazy = fmap fst dirtLazy
+          finalGen = snd $ last dirtLazy
+          dirtLazy = take len $ lazyRepeatExpr gen
+        
+
+lazyRepeatExpr :: StdGen -> [(Expr, StdGen)]  
+lazyRepeatExpr gen = (curOper, firstGen) : lazyRepeatExpr firstGen
+            
     where (numOper, firstGen) = randomR ((0, 1) :: (Int, Int)) gen
           curOper = Expr (numOper /= 0)
 
-repeatExprBro :: StdGen -> [(Expr, StdGen)]
-repeatExprBro gen = (curOper, secondGen) : repeatExprBro firstGen
+
+repeatExprBro :: StdGen -> Int -> ([Expr], StdGen)
+repeatExprBro gen len = (pureLazy, finalGen)
+
+    where pureLazy = fmap fst dirtLazy
+          finalGen = snd $ last dirtLazy
+          dirtLazy = take len $ lazyRepeatExprBro gen
+
+        
+lazyRepeatExprBro :: StdGen -> [(Expr, StdGen)]
+lazyRepeatExprBro gen = (curOper, secondGen) : lazyRepeatExprBro firstGen
 
     where (numOper, firstGen) = randomR ((0, 1) :: (Int, Int)) gen
           (numPlus, secondGen) = randomR ((0, 1) :: (Int, Int)) firstGen

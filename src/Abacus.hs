@@ -115,7 +115,7 @@ a --! [] = a
 
 
 curMerelyAbacus :: StdGen -> [RowAbacus] -> [Expr] -> ([Abacus], StdGen)
-curMerelyAbacus gen abacus [] = ([Abacus abacus], gen)
+curMerelyAbacus gen abacus [] = (Equal : [Abacus abacus], gen)
 curMerelyAbacus gen abacus (expr:fs)
     = let (futureAbacusis, futureGen) = curMerelyAbacus newGen newStandAbacus fs
         in (operExpr : Abacus curAbacus : futureAbacusis, futureGen)
@@ -130,7 +130,7 @@ curMerelyAbacus gen abacus (expr:fs)
           newStandAbacus = abacus `randomExpr` curAbacus
 
 curBrotherAbacus :: StdGen -> [RowAbacus] -> [Expr] -> ([Abacus], StdGen)
-curBrotherAbacus gen abacus [] = ([Abacus abacus], gen)
+curBrotherAbacus gen abacus [] = (Equal : [Abacus abacus], gen)
 curBrotherAbacus gen abacus (expr:fs)
     = let (futureAbacusis, futureGen) = curBrotherAbacus newGen newStandAbacus fs
         in (operExpr : Abacus curAbacus : futureAbacusis, futureGen)
@@ -143,7 +143,7 @@ curBrotherAbacus gen abacus (expr:fs)
           newStandAbacus = abacus `randomExpr` curAbacus
 
 curFriendAbacus :: StdGen -> [RowAbacus] -> [Expr] -> ([Abacus], StdGen)
-curFriendAbacus gen abacus [] = ([Abacus abacus], gen)
+curFriendAbacus gen abacus [] = (Equal : [Abacus abacus], gen)
 curFriendAbacus gen abacus (expr:fs)
     = let (futureAbacusis, futureGen) = curFriendAbacus newGen newStandAbacus fs
         in (operExpr : Abacus curAbacus : futureAbacusis, futureGen)

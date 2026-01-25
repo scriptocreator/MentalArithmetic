@@ -359,6 +359,18 @@ mathElemEditSet (EditRangeRows {}) (EditRangeRows {}) = True
 mathElemEditSet _ _ = False
 
 
+lazyPowerInAbacus :: StdGen -> Int -> (Int, Int) -> ([RowAbacus], StdGen)
+lazyPowerInAbacus gen len power = (pureLazy, finalGen)
+
+    where pureLazy = fmap fst dirtLazy
+          finalGen = snd $ last dirtLazy
+          dirtLazy = take len $ nestedLazy gen
+
+          nestedLazy gen =
+            let ready@(readyRow, newGen) = powerInAbacus gen power
+            in ready : nestedLazy newGen
+
+
 powerInAbacus :: StdGen -> (Int, Int) -> (RowAbacus, StdGen)
 powerInAbacus gen (numLower, numUpper) = (RowAbacus newLower newUpper, finalGen)
 
@@ -388,4 +400,5 @@ exprAbacusInList :: [Abacus] -> [String]
 exprAbacusInList [] = []
 exprAbacusInList (Plus:as) = " + " : exprAbacusInList as
 exprAbacusInList (Minus:as) = " - " : exprAbacusInList as
+exprAbacusInList (Equal:as) = " = " : exprAbacusInList as
 exprAbacusInList (Abacus abacus:as) = show (abacusInNum abacus) : exprAbacusInList as

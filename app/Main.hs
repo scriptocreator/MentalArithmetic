@@ -52,14 +52,18 @@ picture (EditSettings sets :\^/ App _ _ _ indent mCarrSet) = pictures allPicturi
             ([], {-(0, 0))-} (fromIntegral (-halfHoriz), fromIntegral halfVert - snd3 indent))
             newGraphs
 
-picture (App (Expressions exprs) _ _ _ _ :\^/ Settings (StartLine start) (LengthExpr lenExpr) _ _ _) = pictures allPicturies
+picture (App (Expressions exprs) _ _ _ _ :\^/ Settings (StartLine start) (LengthExpr lenExpr) _ _ _)
+    = pictures splitLinesAbacus
+    -- = pictures allPicturies
 
-    where funcSplitLinesAbacus :: [Abacus] -> [String]
-          funcSplitLinesAbacus a = fmap unlines $ splitList lenExpr $ exprAbacusInList a
+    where compPicture = Scale 0.1 0.1 . Color black . Text
+      
+          funcSplitLinesAbacus :: [Abacus] -> String
+          funcSplitLinesAbacus = {-fmap-} unwords {-. splitList lenExpr-} . exprAbacusInList
 
-          splitLinesAbacus = fmap funcSplitLinesAbacus exprs
+          splitLinesAbacus = fmap (compPicture . funcSplitLinesAbacus) exprs
 
-          (_, allPicturies) = foldl outputAbacusis (start, []) splitLinesAbacus
+          --(_, allPicturies) = foldl outputAbacusis (start, []) splitLinesAbacus
 
 
 outputAbacusis :: (Int, [Picture]) -> [String] -> (Int, [Picture])
@@ -169,22 +173,17 @@ handleKey (EventKey (SpecialKey KeyCtrlL) Down _ _) world@(EditSettings listEffS
             Brother -> (curBrotherAbacus, repeatExprBro)
             Friend -> (curFriendAbacus, repeatExpr)
 
-          adjustmentLenExpr = pureLenExpr `div` 2
+          adjustmentLenExpr = pred pureLenExpr
           (finalExpr, finalGen) = generator rand pureQuant
 
           generator :: StdGen -> Int -> ([[Abacus]], StdGen)
           generator gen 0 = ([], gen)
           generator gen n = ((Abacus baseAbacus : freeBaseAbacus) : futureGenericExpr, finalGen)
 
-                where (baseAbacus, firstGen) =
-                        let (baseRow, nullGen) = powerInAbacus gen newAbacus
-                        in (replicate pureLenExpr baseRow, nullGen)
-                      clearBaseAbacus = clearVoidRows baseAbacus
-                      lazyReady = rep firstGen
-                      readyExprGen = take adjustmentLenExpr lazyReady
-                      secondGen = snd $ last readyExprGen
-                      readyExpr = fmap fst readyExprGen
-                      (freeBaseAbacus, thirdGen) = abac secondGen clearBaseAbacus readyExpr
+                where (dirtBaseAbacus, firstGen) = lazyPowerInAbacus gen pureLenExpr newAbacus
+                      baseAbacus = clearVoidRows dirtBaseAbacus
+                      (readyExpr, secondGen) = rep firstGen adjustmentLenExpr
+                      (freeBaseAbacus, thirdGen) = abac secondGen baseAbacus readyExpr
                       (futureGenericExpr, finalGen) = (generator thirdGen . pred) n
 
 

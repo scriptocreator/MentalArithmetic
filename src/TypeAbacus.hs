@@ -23,6 +23,7 @@ data Abacus
     = Abacus [RowAbacus]
     | Plus
     | Minus
+    | Equal
     deriving (Show, Eq)
 
 data RowAbacus = RowAbacus [Done] Bool deriving Show
