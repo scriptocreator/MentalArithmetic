@@ -13,9 +13,39 @@ infixr 6 --!
 
 
 
-instance Ord RowAbacus where
-    RowAbacus leftLower True > RowAbacus rightLower False = True
-    RowAbacus leftLower False > RowAbacus rightLower True = False
+instance {-# OVERLAPPING #-} Ord [RowAbacus] where
+    leftR > rightR =
+        let futureRows = leftR #> rightR
+        in case futureRows of
+            LT -> False
+            EQ -> False
+            GT -> True
+
+        where [] #> [] = EQ
+              _ #> [] = GT
+              [] #> _ = LT
+
+              (RowAbacus leftLower leftUpper:leftRS) #> (RowAbacus rightLower rightUpper:rightRS)
+                | not leftUpper && rightUpper = case futureRows of
+                    LT -> LT
+                    EQ -> LT
+                    GT -> GT
+
+                | not (leftUpper || rightUpper) || (leftUpper && rightUpper) =  case futureRows of
+                    LT -> LT
+                    EQ -> compare natNegLower 0
+                    GT -> GT
+
+                -- В случае, если левая 5 присутствует, а правая нет
+                | otherwise = case futureRows of
+                    LT -> LT
+                    EQ -> GT
+                    GT -> GT
+
+                where futureRows = leftRS #> rightRS
+                      numLeftLower = length leftLower
+                      numRightLower = length rightLower
+                      natNegLower = numLeftLower - numRightLower
 
     leftRow < rightRow = not $ leftRow > rightRow
 
@@ -95,7 +125,7 @@ curMerelyAbacus gen abacus (expr:fs)
             then ((+), newMerelyAbacusPlus, Plus)
             else ((-), newMerelyAbacusMinus, Minus)
            -- Создание текущего аргумента @curAbacus, по диапазонам и теме
-          (curAbacus, newGen) = newAbacusAndGen gen f abacus
+          (curAbacus, newGen) = newAbacusAndGen abacus operExpr f gen
           -- Применение операции @randomExpr на аргументах
           newStandAbacus = abacus `randomExpr` curAbacus
 
@@ -109,7 +139,7 @@ curBrotherAbacus gen abacus (expr:fs)
           (randomExpr, f, operExpr) = if logExpr
             then ((+), newBrotherAbacusPlus, Plus)
             else ((-), newBrotherAbacusMinus, Minus)
-          (curAbacus, newGen) = newAbacusAndGen gen (f logPlus) abacus
+          (curAbacus, newGen) = newAbacusAndGen abacus operExpr (f logPlus) gen
           newStandAbacus = abacus `randomExpr` curAbacus
 
 curFriendAbacus :: StdGen -> [RowAbacus] -> [Expr] -> ([Abacus], StdGen)
@@ -122,15 +152,24 @@ curFriendAbacus gen abacus (expr:fs)
           (randomExpr, f, operExpr) = if logExpr
             then ((+), newFriendAbacusPlus, Plus)
             else ((-), newFriendAbacusMinus, Minus)
-          (curAbacus, newGen) = newAbacusAndGen gen f abacus
+          (curAbacus, newGen) = newAbacusAndGen abacus operExpr f gen
           newStandAbacus = abacus `randomExpr` curAbacus
 
 
-newAbacusAndGen :: StdGen -> (RowAbacus -> (Int, Int)) -> [RowAbacus] -> ([RowAbacus], StdGen)
-newAbacusAndGen gen _ [] = ([], gen)
-newAbacusAndGen gen f (row:as) =
+newAbacusAndGen :: [RowAbacus] -> Abacus -> (RowAbacus -> (Int, Int)) -> StdGen -> ([RowAbacus], StdGen)
+newAbacusAndGen abacus operExpr f curGen =
+    let (curAbacus, newGen) = dirtyAbacusAndGen curGen f abacus
+        clearAbacus = clearVoidRows curAbacus
+    in if operExpr == Minus && abacus < clearAbacus
+        then newAbacusAndGen abacus operExpr f newGen
+        else (clearAbacus, newGen)
+
+
+dirtyAbacusAndGen :: StdGen -> (RowAbacus -> (Int, Int)) -> [RowAbacus] -> ([RowAbacus], StdGen)
+dirtyAbacusAndGen gen _ [] = ([], gen)
+dirtyAbacusAndGen gen f (row:as) =
     let (curRow, firstGen) = powerInAbacus gen $ f row
-        (futureRows, secondGen) = newAbacusAndGen firstGen f as
+        (futureRows, secondGen) = dirtyAbacusAndGen firstGen f as
     in (curRow : futureRows, secondGen)
 
 
@@ -171,3 +210,20 @@ newFriendAbacusMinus (RowAbacus lower upper) = (4, 1)
 
 newAbacus :: (Int, Int)
 newAbacus = (4, 1)
+
+
+clearVoidRows :: [RowAbacus] -> [RowAbacus]
+clearVoidRows rows = snd $ nestedClear rows
+
+    where nestedClear :: [RowAbacus] -> (Bool, [RowAbacus])
+          nestedClear [] = (False, [])
+
+          nestedClear (row@(RowAbacus [] False):rows) =
+            let (futureLogVoid, futureRows) = nestedClear rows
+            in if futureLogVoid
+                then (True, [])
+                else (False, row : futureRows)
+
+          nestedClear (row:rows) =
+            let (_, futureRows) = nestedClear rows
+            in (False, row : futureRows)

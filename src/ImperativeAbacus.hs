@@ -100,6 +100,18 @@ lambdaGraph _ tuple =
     in ((), lambda tuple)
 
 
+sortEditSet :: [EditSet] -> Maybe [EditSet]
+sortEditSet sets =
+    let sort = sortUnitList () lambdaEditSet sets
+        filtSort = filter (/=EditSetVoid) sort
+    in if length filtSort == 5
+        then return filtSort
+        else Nothing
+
+lambdaEditSet :: () -> EditSet -> ((), Int)
+lambdaEditSet () s = ((), fromEnum s)
+
+
 sortUnitList :: Show a => c -> (c -> a -> (c, Int)) -> [a] -> [a]
 sortUnitList c fromA = nestedSort c []
 
@@ -345,28 +357,6 @@ mathElemEditSet (EditQuantityQuestion {}) (EditQuantityQuestion {}) = True
 mathElemEditSet (EditTheme {}) (EditTheme {}) = True
 mathElemEditSet (EditRangeRows {}) (EditRangeRows {}) = True
 mathElemEditSet _ _ = False
-
-{-
-sortEditApp :: [EditApp] -> Maybe [EditApp]
-sortEditApp = nestedSort Nothing Nothing Nothing
-
-    where nestedSort (Just expr) (Just rand) (Just carr) [] = Just [expr, rand, carr]
-          nestedSort expr rand carr (x@(EditExpressions {}):xs) = nestedSort (return x) rand carr xs
-          nestedSort expr rand carr (x@(EditRandom {}):xs)      = nestedSort expr (return x) carr xs
-          nestedSort expr rand carr (x@(EditCarriage {}):xs)    = nestedSort expr rand (return x) xs
-          nestedSort _ _ _ _ = Nothing
--}
-
-sortEditSet :: [EditSet] -> Maybe [EditSet]
-sortEditSet = nestedSort Nothing Nothing Nothing Nothing Nothing
-
-    where nestedSort (Just start) (Just lenExpr) (Just quant) (Just theme) (Just range) [] = return [start, lenExpr, quant, theme, range]
-          nestedSort start lenExpr quant theme range (x@(EditStartLine {}):xs)        = nestedSort (return x) lenExpr quant theme range xs
-          nestedSort start lenExpr quant theme range (x@(EditLengthExpr {}):xs)       = nestedSort start (return x) quant theme range xs
-          nestedSort start lenExpr quant theme range (x@(EditQuantityQuestion {}):xs) = nestedSort start lenExpr (return x) theme range xs
-          nestedSort start lenExpr quant theme range (x@(EditTheme {}):xs)            = nestedSort start lenExpr quant (return x) range xs
-          nestedSort start lenExpr quant theme range (x@(EditRangeRows {}):xs)        = nestedSort start lenExpr quant theme (return x) xs
-          nestedSort _ _ _ _ _ _ = Nothing
 
 
 powerInAbacus :: StdGen -> (Int, Int) -> (RowAbacus, StdGen)
