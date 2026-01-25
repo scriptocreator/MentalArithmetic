@@ -43,7 +43,7 @@ newtype StartLine = StartLine Int deriving (Show, Eq)
 newtype LengthExpr = LengthExpr Int deriving (Show, Eq)
 newtype QuantityQuestion = QuantityQuestion Int deriving (Show, Eq)
 data Theme = ThemeVoid | Merely | Brother | Friend deriving (Show, Eq, Ord)
-data RangeRows = RangeRows Int Int deriving (Show, Eq)
+data RangeRows = RangeRows {minRange :: Int, maxRange :: Int} deriving (Show, Eq)
 
 
 instance Enum Theme where

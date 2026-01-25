@@ -173,6 +173,7 @@ handleKey (EventKey (SpecialKey KeyCtrlL) Down _ _) world@(EditSettings listEffS
             Brother -> (curBrotherAbacus, repeatExprBro)
             Friend -> (curFriendAbacus, repeatExpr)
 
+          tupleRange = (minRange range, maxRange range)
           adjustmentLenExpr = pred pureLenExpr
           (finalExpr, finalGen) = generator rand pureQuant
 
@@ -180,10 +181,10 @@ handleKey (EventKey (SpecialKey KeyCtrlL) Down _ _) world@(EditSettings listEffS
           generator gen 0 = ([], gen)
           generator gen n = ((Abacus baseAbacus : freeBaseAbacus) : futureGenericExpr, finalGen)
 
-                where (dirtBaseAbacus, firstGen) = lazyPowerInAbacus gen pureLenExpr newAbacus
+                where (dirtBaseAbacus, firstGen) = lazyPowerInAbacus gen tupleRange newAbacus
                       baseAbacus = clearVoidRows dirtBaseAbacus
                       (readyExpr, secondGen) = rep firstGen adjustmentLenExpr
-                      (freeBaseAbacus, thirdGen) = abac secondGen baseAbacus readyExpr
+                      (freeBaseAbacus, thirdGen) = abac secondGen baseAbacus tupleRange readyExpr
                       (futureGenericExpr, finalGen) = (generator thirdGen . pred) n
 
 

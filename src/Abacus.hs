@@ -7,7 +7,7 @@ import PureFunctions
 import LazyFunctions
 import ImperativeAbacus
 
-import System.Random.Stateful ( StdGen )
+import System.Random ( StdGen, Random(randomR) )
 
 infixr 6 --!
 
@@ -114,63 +114,82 @@ a --! [] = a
 (Done:fis) --! (Done:sis) = fis --! sis
 
 
-curMerelyAbacus :: StdGen -> [RowAbacus] -> [Expr] -> ([Abacus], StdGen)
-curMerelyAbacus gen abacus [] = (Equal : [Abacus abacus], gen)
-curMerelyAbacus gen abacus (expr:fs)
-    = let (futureAbacusis, futureGen) = curMerelyAbacus newGen newStandAbacus fs
+curMerelyAbacus :: StdGen -> [RowAbacus] -> (Int, Int) -> [Expr] -> ([Abacus], StdGen)
+curMerelyAbacus gen abacus tupleRange [] = (Equal : [Abacus abacus], gen)
+curMerelyAbacus gen abacus tupleRange (expr:fs)
+    = let (futureAbacusis, futureGen) = curMerelyAbacus newGen newStandAbacus tupleRange fs
         in (operExpr : Abacus curAbacus : futureAbacusis, futureGen)
 
     where logExpr = operator expr
-          (randomExpr, f, operExpr) = if logExpr
+          ((+|-), f, operExpr) = if logExpr
             then ((+), newMerelyAbacusPlus, Plus)
             else ((-), newMerelyAbacusMinus, Minus)
            -- Создание текущего аргумента @curAbacus, по диапазонам и теме
-          (curAbacus, newGen) = newAbacusAndGen abacus operExpr f gen
+          (curAbacus, newGen) = newAbacusAndGen abacus tupleRange operExpr f gen
           -- Применение операции @randomExpr на аргументах
-          newStandAbacus = abacus `randomExpr` curAbacus
+          newStandAbacus = abacus +|- curAbacus
 
-curBrotherAbacus :: StdGen -> [RowAbacus] -> [Expr] -> ([Abacus], StdGen)
-curBrotherAbacus gen abacus [] = (Equal : [Abacus abacus], gen)
-curBrotherAbacus gen abacus (expr:fs)
-    = let (futureAbacusis, futureGen) = curBrotherAbacus newGen newStandAbacus fs
+curBrotherAbacus :: StdGen -> [RowAbacus] -> (Int, Int) -> [Expr] -> ([Abacus], StdGen)
+curBrotherAbacus gen abacus tupleRange [] = (Equal : [Abacus abacus], gen)
+curBrotherAbacus gen abacus tupleRange (expr:fs)
+    = let (futureAbacusis, futureGen) = curBrotherAbacus newGen newStandAbacus tupleRange fs
         in (operExpr : Abacus curAbacus : futureAbacusis, futureGen)
 
     where (logExpr, logPlus) = (operator expr, ifPlus expr)
-          (randomExpr, f, operExpr) = if logExpr
+          ((+|-), f, operExpr) = if logExpr
             then ((+), newBrotherAbacusPlus, Plus)
             else ((-), newBrotherAbacusMinus, Minus)
-          (curAbacus, newGen) = newAbacusAndGen abacus operExpr (f logPlus) gen
-          newStandAbacus = abacus `randomExpr` curAbacus
+          (curAbacus, newGen) = newAbacusAndGen abacus tupleRange operExpr (f logPlus) gen
+          newStandAbacus = abacus +|- curAbacus
 
-curFriendAbacus :: StdGen -> [RowAbacus] -> [Expr] -> ([Abacus], StdGen)
-curFriendAbacus gen abacus [] = (Equal : [Abacus abacus], gen)
-curFriendAbacus gen abacus (expr:fs)
-    = let (futureAbacusis, futureGen) = curFriendAbacus newGen newStandAbacus fs
+curFriendAbacus :: StdGen -> [RowAbacus] -> (Int, Int) -> [Expr] -> ([Abacus], StdGen)
+curFriendAbacus gen abacus tupleRange [] = (Equal : [Abacus abacus], gen)
+curFriendAbacus gen abacus tupleRange (expr:fs)
+    = let (futureAbacusis, futureGen) = curFriendAbacus newGen newStandAbacus tupleRange fs
         in (operExpr : Abacus curAbacus : futureAbacusis, futureGen)
 
     where logExpr = operator expr
-          (randomExpr, f, operExpr) = if logExpr
+          ((+|-), f, operExpr) = if logExpr
             then ((+), newFriendAbacusPlus, Plus)
             else ((-), newFriendAbacusMinus, Minus)
-          (curAbacus, newGen) = newAbacusAndGen abacus operExpr f gen
-          newStandAbacus = abacus `randomExpr` curAbacus
+          (curAbacus, newGen) = newAbacusAndGen abacus tupleRange operExpr f gen
+          newStandAbacus = abacus +|- curAbacus
 
 
-newAbacusAndGen :: [RowAbacus] -> Abacus -> (RowAbacus -> (Int, Int)) -> StdGen -> ([RowAbacus], StdGen)
-newAbacusAndGen abacus operExpr f curGen =
-    let (curAbacus, newGen) = dirtyAbacusAndGen curGen f abacus
-        clearAbacus = clearVoidRows curAbacus
-    in if operExpr == Minus && abacus < clearAbacus
-        then newAbacusAndGen abacus operExpr f newGen
-        else (clearAbacus, newGen)
+newAbacusAndGen :: [RowAbacus]
+                -> (Int, Int)
+                -> Abacus
+                -> (RowAbacus -> (Int, Int))
+                -> StdGen
+                -> ([RowAbacus], StdGen)
+
+newAbacusAndGen abacus tupleRange operExpr f curGen =
+    let (dirtCurAbacus, newGen) = dirtyAbacusAndGen curGen tupleRange f abacus
+        curAbacus = clearVoidRows dirtCurAbacus
+
+    in if abacusInNum curAbacus == 0 || (operExpr == Minus && abacus < curAbacus)
+        then newAbacusAndGen abacus tupleRange operExpr f newGen
+        else (curAbacus, newGen)
 
 
-dirtyAbacusAndGen :: StdGen -> (RowAbacus -> (Int, Int)) -> [RowAbacus] -> ([RowAbacus], StdGen)
-dirtyAbacusAndGen gen _ [] = ([], gen)
-dirtyAbacusAndGen gen f (row:as) =
-    let (curRow, firstGen) = powerInAbacus gen $ f row
-        (futureRows, secondGen) = dirtyAbacusAndGen firstGen f as
-    in (curRow : futureRows, secondGen)
+dirtyAbacusAndGen :: StdGen
+                  -> (Int, Int)
+                  -> (RowAbacus -> (Int, Int))
+                  -> [RowAbacus]
+                  -> ([RowAbacus], StdGen)
+
+dirtyAbacusAndGen gen tupleRange f rows = (pureLazy, finalGen)
+
+    where (lenCurAbacus, firstGen) = randomR tupleRange gen
+        
+          pureLazy = fmap fst dirtLazy
+          finalGen = snd $ last dirtLazy
+          dirtLazy = take lenCurAbacus $ nestedDirty firstGen rows
+
+          nestedDirty gen [] = []
+          nestedDirty gen (row:as) =
+            let ready@(curRow, secondGen) = powerInAbacus gen $ f row
+            in (ready : nestedDirty secondGen as)
 
 
 newMerelyAbacusPlus :: RowAbacus -> (Int, Int)

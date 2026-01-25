@@ -359,12 +359,16 @@ mathElemEditSet (EditRangeRows {}) (EditRangeRows {}) = True
 mathElemEditSet _ _ = False
 
 
-lazyPowerInAbacus :: StdGen -> Int -> (Int, Int) -> ([RowAbacus], StdGen)
-lazyPowerInAbacus gen len power = (pureLazy, finalGen)
+lazyPowerInAbacus :: StdGen -> (Int, Int) -> (Int, Int) -> ([RowAbacus], StdGen)
+lazyPowerInAbacus gen tupleRange power = if abacusInNum pureLazy == 0
+    then lazyPowerInAbacus finalGen tupleRange power
+    else (pureLazy, finalGen)
 
-    where pureLazy = fmap fst dirtLazy
+    where (lenCurAbacus, firstGen) = randomR tupleRange gen
+          
+          pureLazy = fmap fst dirtLazy
           finalGen = snd $ last dirtLazy
-          dirtLazy = take len $ nestedLazy gen
+          dirtLazy = take lenCurAbacus $ nestedLazy firstGen
 
           nestedLazy gen =
             let ready@(readyRow, newGen) = powerInAbacus gen power
