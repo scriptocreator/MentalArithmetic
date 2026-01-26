@@ -203,7 +203,7 @@ rowsInNum nRows = if isNegative nRows
           nestedNum ((level, var):rs) = level * var + nestedNum rs
 
           unitNumber :: Int
-          unitNumber = nestedNum $ zip [1,10..] rows
+          unitNumber = nestedNum $ zip (iterate (*10) 1) rows
 
 
 keyInBool :: SpecialKey -> Bool
@@ -410,7 +410,7 @@ powerInAbacus gen (numLower, numUpper) = (RowAbacus newLower newUpper, finalGen)
 
 
 abacusInNum :: [RowAbacus] -> Int
-abacusInNum abacus = internalNum $ zip [1,10..] abacus
+abacusInNum abacus = internalNum $ zip (iterate (*10) 1) abacus
 
     where internalNum [] = 0
           internalNum ((row, RowAbacus lower upper):abacusis) = let numUpper = if upper then 5 * row else 0
