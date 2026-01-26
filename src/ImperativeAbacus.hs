@@ -16,6 +16,20 @@ import Data.List (find)
 
 
 
+checkAbacus :: [RowAbacus] -> [RowAbacus] -> Theme -> Abacus -> Bool
+checkAbacus abacus curAbacus _ {-Merely-} oper = False
+{-
+    where curOper = case oper of
+            Minus -> let resultAbacus = abacus - curAbacus
+                in resultAbacus
+            Plus -> 
+            expr -> error $ show expr
+          abacus curAbacus
+
+checkAbacus abacus curAbacus Brother
+checkAbacus abacus curAbacus Friend
+-}
+
 setToGraph :: [EditSet] -> [Graph String String]
 setToGraph [] = []
 setToGraph sets = GraphMarker headS : tailS
@@ -390,6 +404,9 @@ powerInAbacus gen (numLower, numUpper) = (RowAbacus newLower newUpper, finalGen)
                 else (curUpper, secondGen)
 
 --powerInAbacus (numLower, numUpper) = RowAbacus (take numLower $ repeat Done) (if numUpper == 0 then False else True)
+
+
+--numInAbacus :: Int -> [RowAbacus]
 
 
 abacusInNum :: [RowAbacus] -> Int

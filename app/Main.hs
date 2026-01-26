@@ -53,26 +53,40 @@ picture (EditSettings sets :\^/ App _ _ _ indent mCarrSet) = pictures allPicturi
             newGraphs
 
 picture (App (Expressions exprs) _ _ _ _ :\^/ Settings (StartLine start) (LengthExpr lenExpr) _ _ _)
-    = pictures splitLinesAbacus
-    -- = pictures allPicturies
+    -- = pictures splitLinesAbacus
+    = pictures [Translate 0 0 $ pictures allPicturies]
 
     where compPicture = Scale 0.1 0.1 . Color black . Text
       
           funcSplitLinesAbacus :: [Abacus] -> String
           funcSplitLinesAbacus = {-fmap-} unwords {-. splitList lenExpr-} . exprAbacusInList
 
-          splitLinesAbacus = fmap (compPicture . funcSplitLinesAbacus) exprs
+          funcLinesAndShow [] = []
+          funcLinesAndShow ((l,s):lss) = l : s : funcLinesAndShow lss
 
-          --(_, allPicturies) = foldl outputAbacusis (start, []) splitLinesAbacus
+          linesAndShow = funcLinesAndShow zipLinesShow
+          zipLinesShow = flip zip showsAbacus $ return splitLinesAbacus
+          showsAbacus = fmap (fmap show) exprs
+          splitLinesAbacus = fmap ({-compPicture .-} funcSplitLinesAbacus) exprs
 
+          (_, allPicturies) = foldl outputAbacusis (0 {-start-}, []) linesAndShow --splitLinesAbacus
+
+{-
+outputExpressions (current, predPictures)
+    | current < (-halfVert) = 
+    | current > (-halfVert) = outputExpressions
+    | otherwise = outputExpressions (newCurrent, predPictures) ss
+    where newCurrent = current + 20
+-}
 
 outputAbacusis :: (Int, [Picture]) -> [String] -> (Int, [Picture])
 outputAbacusis st [] = st
 outputAbacusis (current, predPictures) (str:ss)
-    | current < (-halfVert) = (current + 40, predPictures)
-    | current > halfVert = outputAbacusis (newCurrent, predPictures ++ [Text str]) ss
+    | current < (-halfVert) = (current - 40, predPictures)
+    | current > (-halfVert) = outputAbacusis
+        (newCurrent, predPictures ++ return (pictures [Translate 0 (fromIntegral current) $ Scale 0.1 0.1 $ Color black $ Text str])) ss
     | otherwise = outputAbacusis (newCurrent, predPictures) ss
-    where newCurrent = current + 20
+    where newCurrent = current - 20
 
 
 outputSettings :: Direct
