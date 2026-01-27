@@ -9,6 +9,12 @@ import Data.Maybe
 
 
 
+getLast :: [a] -> a
+getLast [] = error "Error PureFunctions getLast: Передан пустой список"
+getLast [x] = x
+getLast (_:xs) = getLast xs
+
+
 funcIf :: Bool -> n -> n -> n
 funcIf log a b = if log then a else b
 
@@ -43,7 +49,7 @@ putTypeList :: TypeTag -> [TypeTag] -> [TypeTag]
 putTypeList t [] = [t]
 putTypeList t (tel:ls)
     | left t == left tel
-        = error $ printf "Error PureFunctions №1: Обнаружена ещё одна переменная под аргумент конструктора – «%s» и «%s»"
+        = error $ printf "Error PureFunctions putTypeList: Обнаружена ещё одна переменная под аргумент конструктора – «%s» и «%s»"
                          (show arg1)
                          (show arg2)
     | left t < left tel = t : tel : ls

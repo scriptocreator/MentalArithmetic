@@ -3,9 +3,9 @@
 module Abacus where
 
 import TypeAbacus
-import PureFunctions ( funcIf )
+import PureFunctions ( funcIf, getLast )
 import LazyFunctions
-import ImperativeAbacus ( abacusInNum, powerInAbacus, checkAbacus )
+import ImperativeAbacus ( abacusInNum, powerInAbacus, checkAbacus, numInAbacus )
 import TypeImperativeAbacus (Theme)
 
 import System.Random ( StdGen, Random(randomR) )
@@ -74,7 +74,7 @@ instance Num [RowAbacus] where
 
     [] - [] = []
     left - [] = left
-    [] - right = error "Error Abacus №1: Вычитать больший абакус нельзя"
+    [] - right = error "Error Abacus (-): Вычитать больший абакус нельзя"
 
     (RowAbacus leftLower leftUpper:ls) - (RowAbacus rightLower rightUpper:rs)
         | not leftUpper && rightUpper =
@@ -103,14 +103,14 @@ instance Num [RowAbacus] where
 
 
 balanceRow :: [RowAbacus] -> [RowAbacus]
-balanceRow [] = error "Error Abacus №2: У абакуса обнаружены пустые разряды"
+balanceRow [] = error "Error Abacus balanceRow: У абакуса обнаружены пустые разряды"
 balanceRow (RowAbacus (_:lowers) upper:rows) = RowAbacus lowers upper : rows
 balanceRow (RowAbacus [] True:rows) = RowAbacus [Done, Done, Done, Done] False : rows
 balanceRow (_:rows) = RowAbacus [Done, Done, Done, Done] True : balanceRow rows
 
 (--!) :: [Done] -> [Done] -> [Done]
 [] --! [] = []
-[] --! _ = error "Error Abacus N3: Для натурального счёта, вычитается большее число косточек"
+[] --! _ = error "Error Abacus (--!): Для натурального счёта, вычитается большее число косточек"
 a --! [] = a
 (Done:fis) --! (Done:sis) = fis --! sis
 
@@ -119,79 +119,104 @@ curMerelyAbacus :: StdGen -> [RowAbacus] -> (Int, Int) {--> Theme-} -> [Expr] ->
 curMerelyAbacus gen abacus tupleRange [] = (Equal : [Abacus abacus], gen)
 curMerelyAbacus gen abacus tupleRange (expr:fs)
     = let (futureAbacusis, futureGen) = curMerelyAbacus newGen newStandAbacus tupleRange fs
-        in (operExpr : Abacus curAbacus : futureAbacusis, futureGen)
+        in (curOperExpr : Abacus curAbacus : futureAbacusis, futureGen)
 
     where logExpr = operator expr
           ((+|-), f, operExpr) = if logExpr
             then ((+), newMerelyAbacusPlus, Plus)
             else ((-), newMerelyAbacusMinus, Minus)
-           -- Создание текущего аргумента @curAbacus, по диапазонам и теме
-          (curAbacus, newGen) = newAbacusAndGen abacus tupleRange operExpr f gen
-          -- Применение операции @randomExpr на аргументах
+           -- Создание текущего аргумента @curAbacus и оператора @curOperExpr, по диапазонам и теме
+          (curOperExpr, curAbacus, newGen) = newAbacusAndGen abacus operExpr tupleRange f gen
+          -- Применение операции @(+|=) на аргументах
           newStandAbacus = abacus +|- curAbacus
 
 curBrotherAbacus :: StdGen -> [RowAbacus] -> (Int, Int) {--> Theme-} -> [Expr] -> ([Abacus], StdGen)
 curBrotherAbacus gen abacus tupleRange [] = (Equal : [Abacus abacus], gen)
 curBrotherAbacus gen abacus tupleRange (expr:fs)
     = let (futureAbacusis, futureGen) = curBrotherAbacus newGen newStandAbacus tupleRange fs
-        in (operExpr : Abacus curAbacus : futureAbacusis, futureGen)
+        in (curOperExpr : Abacus curAbacus : futureAbacusis, futureGen)
 
     where (logExpr, logPlus) = (operator expr, ifPlus expr)
           ((+|-), f, operExpr) = if logExpr
             then ((+), newBrotherAbacusPlus, Plus)
             else ((-), newBrotherAbacusMinus, Minus)
-          (curAbacus, newGen) = newAbacusAndGen abacus tupleRange operExpr (f logPlus) gen
+          (curOperExpr, curAbacus, newGen) = newAbacusAndGen abacus operExpr tupleRange (f logPlus) gen
           newStandAbacus = abacus +|- curAbacus
 
 curFriendAbacus :: StdGen -> [RowAbacus] -> (Int, Int) {--> Theme-} -> [Expr] -> ([Abacus], StdGen)
 curFriendAbacus gen abacus tupleRange [] = (Equal : [Abacus abacus], gen)
 curFriendAbacus gen abacus tupleRange (expr:fs)
     = let (futureAbacusis, futureGen) = curFriendAbacus newGen newStandAbacus tupleRange fs
-        in (operExpr : Abacus curAbacus : futureAbacusis, futureGen)
+        in (curOperExpr : Abacus curAbacus : futureAbacusis, futureGen)
 
     where logExpr = operator expr
           ((+|-), f, operExpr) = if logExpr
             then ((+), newFriendAbacusPlus, Plus)
             else ((-), newFriendAbacusMinus, Minus)
-          (curAbacus, newGen) = newAbacusAndGen abacus tupleRange operExpr f gen
+          (curOperExpr, curAbacus, newGen) = newAbacusAndGen abacus operExpr tupleRange f gen
           newStandAbacus = abacus +|- curAbacus
 
 
+{-| Я заменил версию с использованием @powerInAbacus,
+  | на использование @numInAbacus.
+  |
+  | Это означает, что теперь могут возникать ошибки счёта,
+  | так как я полностью игнорирую правила перехода через 5 и 10.
+  | Ещё возможна ошибка вычитания большего.
+
+  | Но это необходимо, поскольку «стрелять наугад» в правильное
+  | число – не вариант, лучше уж сразу его правильно создать.
+  | Я уже узнал как это сделать:
+  | • Надо создать список минимальных и максимальных потенциалов
+  |   разрядов, и перевернуть его [у меня единицы идут сначала].
+  |   Ну и добавить потенциалы темы, операции, и абакуса состояния
+  |   конечно!
+  | • Потом, передавать минимальное и максимальное число в каждом
+  |   разряде, создавать новое, с новым разрядом в рамках этого
+  |   диапазона, и его числа пределы (пару штук), на 00 и 99 для
+  |   меньших разрядов соответсвенно.
+  | • После, сравнивать их и предыдущие через `min` и `max`,
+  |   и так дойти до единиц.
+  |-}
 newAbacusAndGen :: [RowAbacus]
+                -> Abacus
                 -> (Int, Int)
                 -- -> Theme
-                -> Abacus
                 -> (RowAbacus -> (Int, Int))
                 -> StdGen
-                -> ([RowAbacus], StdGen)
+                -> (Abacus, [RowAbacus], StdGen)
 
-newAbacusAndGen abacus tupleRange operExpr f curGen =
-    let (dirtCurAbacus, newGen) = dirtyAbacusAndGen curGen tupleRange f abacus
-        curAbacus = clearVoidRows dirtCurAbacus
+newAbacusAndGen abacus operExpr range@(nMinRange, nMaxRange) f gen = 
+    case operExpr of
+        Minus -> if checkM < simulaMin'M
+            then plus
+            else minus
 
-    in if abacusInNum curAbacus == 0 || (operExpr == Minus && abacus < curAbacus) -- || checkAbacus abacus curAbacus theme operExpr
-        then newAbacusAndGen abacus tupleRange operExpr f newGen
-        else (curAbacus, newGen)
+        Plus -> if balanceMax'P < simulaMin'P
+            then minus
+            else plus
 
+        _ -> error "Error Abacus newAbacusAndGen: Нарушена цепочка «Абакус Оператор Абакус»"
 
-dirtyAbacusAndGen :: StdGen
-                  -> (Int, Int)
-                  -> (RowAbacus -> (Int, Int))
-                  -> [RowAbacus]
-                  -> ([RowAbacus], StdGen)
-
-dirtyAbacusAndGen gen tupleRange f abacus = (pureLazy, finalGen)
-
-    where (lenCurAbacus, firstGen) = randomR tupleRange gen
+    where minus = (Minus, numInAbacus curNumAbacus'M, newGen'M)
+          plus = (Plus, numInAbacus curNumAbacus'P, newGen'P)
         
-          pureLazy = fmap fst dirtLazy
-          finalGen = snd $ last dirtLazy
-          dirtLazy = take lenCurAbacus $ nestedDirty firstGen abacus
-
-          nestedDirty gen [] = []
-          nestedDirty gen (row:as) =
-            let ready@(curRow, secondGen) = powerInAbacus gen $ f row
-            in (ready : nestedDirty secondGen as)
+          baseAbacusNum = abacusInNum $! abacus
+          (absMinCountRows, absMaxCountRows) = (abs nMinRange, abs nMaxRange)
+          funcSimula numOp =
+            let newMinCountRows = pred absMinCountRows
+            in (if newMinCountRows <= 0 then numOp else 10 ^ newMinCountRows, pred $ 10 ^ absMaxCountRows) :: (Int, Int)
+          
+          (simulaMin'P, simulaMax'P) = funcSimula 1
+          balanceMax'P = simulaMax'P - baseAbacusNum
+          rangeP = (simulaMin'P, balanceMax'P)
+          (curNumAbacus'P, newGen'P) = randomR rangeP gen
+        
+          (simulaMin'M, simulaMax'M) = funcSimula 0
+          balanceMax'M = baseAbacusNum
+          rangeM = (simulaMin'M, balanceMax'M)
+          (curNumAbacus'M, newGen'M) = randomR rangeM gen
+          checkM = balanceMax'M - simulaMin'M
 
 
 newMerelyAbacusPlus :: RowAbacus -> (Int, Int)

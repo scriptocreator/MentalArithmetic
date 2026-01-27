@@ -1,6 +1,7 @@
 module LazyFunctions where
 
 import TypeAbacus
+import PureFunctions (getLast)
 
 import System.Random
 
@@ -8,9 +9,8 @@ import System.Random
 
 repeatExpr :: StdGen -> Int -> ([Expr], StdGen)
 repeatExpr gen len = (pureLazy, finalGen)
-
     where pureLazy = fmap fst dirtLazy
-          finalGen = snd $ last dirtLazy
+          finalGen = snd $! getLast dirtLazy
           dirtLazy = take len $ lazyRepeatExpr gen
         
 
@@ -23,9 +23,8 @@ lazyRepeatExpr gen = (curOper, firstGen) : lazyRepeatExpr firstGen
 
 repeatExprBro :: StdGen -> Int -> ([Expr], StdGen)
 repeatExprBro gen len = (pureLazy, finalGen)
-
     where pureLazy = fmap fst dirtLazy
-          finalGen = snd $ last dirtLazy
+          finalGen = snd $! getLast dirtLazy
           dirtLazy = take len $ lazyRepeatExprBro gen
 
         

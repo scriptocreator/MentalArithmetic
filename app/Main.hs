@@ -165,7 +165,7 @@ selectColor True = red
 
 handleKey :: Event -> World -> World
 handleKey (EventKey (SpecialKey KeyCtrlL) Down _ _) (world@(App {}) :\^/ set@(EditSettings {}))
-    = error "В состоянии редактирования, невозможно переключиться на редактирование приложения"
+    = error "Error Main handleKey: В состоянии редактирования, невозможно переключиться на редактирование приложения"
 
 
 handleKey (EventKey (SpecialKey KeyCtrlL) Down _ _) world@(EditSettings listEffSet :\^/ app)

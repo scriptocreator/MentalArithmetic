@@ -4,7 +4,7 @@ module ImperativeAbacus where
 
 import TypeAbacus
 import TypeImperativeAbacus
-import PureFunctions ( sortTypeList, prodTypeToList, sumTypeToList, tailType, isTypeBool, funcIf )
+import PureFunctions ( sortTypeList, prodTypeToList, sumTypeToList, tailType, isTypeBool, funcIf, getLast )
 
 import System.Random ( StdGen, Random(randomR) )
 import System.Random.Stateful
@@ -58,7 +58,7 @@ unitSetToGraph set@(EditRangeRows {}) =
               (GraphVertical name graphStringsArgs)
 
     where tlSet = funcGetEdit (setToType set)
-          
+
           (headTypeList:tailTypeList) = list tlSet
           eitListWithMarker = UnitRight headTypeList : fmap UnitLeft tailTypeList
           sortEitList = sortUnitList () lambdaEitGraph eitListWithMarker
@@ -90,7 +90,7 @@ nameSet set =
     let mSet = typeToSet set
         updSet = fromJust mSet
         compSet = head . words . showEditSet
-        
+
     in if isJust mSet
         then compSet updSet
         else compSet $ initRightSet set
@@ -109,7 +109,7 @@ sortSetGraphList :: [(EditSet, Graph String String)] -> [(EditSet, Graph String 
 sortSetGraphList = sortUnitList () lambdaGraph
 
 lambdaGraph :: () -> (EditSet, b) -> ((), Int)
-lambdaGraph _ tuple = 
+lambdaGraph _ tuple =
     let lambda = (fromEnum :: EditSet -> Int) . fst
     in ((), lambda tuple)
 
@@ -138,7 +138,7 @@ sortUnitList c fromA = nestedSort c []
           putUnitList s [] = [s]
           putUnitList s (sel:ss)
             | fst s == fst sel
-                = error $ printf "Error ImperativeAbacus №1: Обнаружена ещё одна переменная под аргумент конструктора – «%s» и «%s»"
+                = error $ printf "Error ImperativeAbacus sortUnitList: Обнаружена ещё одна переменная под аргумент конструктора – «%s» и «%s»"
                                  (show arg1)
                                  (show arg2)
             | fst s < fst sel = s : sel : ss
@@ -173,21 +173,7 @@ numInRows num = if num < 0
 
     where absNum = abs num
 
-          accRows rowSimula numSimula
-            | absNum <= numSimula = [tupleRow]
-            | otherwise = tupleRow : accRows newRow newNumSimula
-
-            where tupleRow = (newRow, rowSimula)
-                  newRow = rowSimula * 10
-                  newNumSimula = exponent numSimula
-
-          createRows [] = []
-          createRows ((modRow, divRow):rows)
-            = absNum `mod` modRow `div` divRow : createRows rows
-
-          exponent sim = sim * 10 + sim
-
-          listNumber = createRows $ reverse $ accRows 1 9
+          listNumber = reverse $ createRows absNum
 
 
 rowsInNum :: Number [Int] -> Int
@@ -200,10 +186,11 @@ rowsInNum nRows = if isNegative nRows
 
           nestedNum :: [(Int, Int)] -> Int
           nestedNum [] = 0
-          nestedNum ((level, var):rs) = level * var + nestedNum rs
+          nestedNum ((level, var):rs) =
+            level * var + nestedNum rs
 
           unitNumber :: Int
-          unitNumber = nestedNum $ zip (iterate (*10) 1) rows
+          unitNumber = nestedNum $ zip (iterate (*10) 1) $ reverse rows
 
 
 keyInBool :: SpecialKey -> Bool
@@ -374,19 +361,23 @@ mathElemEditSet _ _ = False
 
 
 lazyPowerInAbacus :: StdGen -> (Int, Int) -> (Int, Int) -> ([RowAbacus], StdGen)
-lazyPowerInAbacus gen tupleRange power = if abacusInNum pureLazy == 0
-    then lazyPowerInAbacus finalGen tupleRange power
-    else (pureLazy, finalGen)
+lazyPowerInAbacus gen tupleRange power = lazyPowerInAbacus' gen 0
 
-    where (lenCurAbacus, firstGen) = randomR tupleRange gen
-          
-          pureLazy = fmap fst dirtLazy
-          finalGen = snd $ last dirtLazy
-          dirtLazy = take lenCurAbacus $ nestedLazy firstGen
+    where lazyPowerInAbacus' gen attempts
+            | attempts > 100 = error "Error ImperativeAbacus lazyPowerInAbacus: слишком много попыток"
+            | lenCurAbacus == 0 = lazyPowerInAbacus' firstGen $ succ attempts
+            | otherwise = (pureLazy, finalGen)
 
-          nestedLazy gen =
-            let ready@(readyRow, newGen) = powerInAbacus gen power
-            in ready : nestedLazy newGen
+            where (lenCurAbacus, firstGen) = randomR tupleRange gen
+
+                  --pureLazyNum = abacusInNum $! pureLazy
+                  pureLazy = fmap fst dirtLazy
+                  finalGen = snd $! getLast dirtLazy
+                  dirtLazy = take lenCurAbacus $ nestedLazy firstGen
+
+                  nestedLazy gen =
+                    let ready@(readyRow, newGen) = powerInAbacus gen power
+                    in ready : nestedLazy newGen
 
 
 powerInAbacus :: StdGen -> (Int, Int) -> (RowAbacus, StdGen)
@@ -398,7 +389,7 @@ powerInAbacus gen (numLower, numUpper) = (RowAbacus newLower newUpper, finalGen)
           (newUpper, finalGen) =
             let (num, secondGen) = randomR (0, numUpper) firstGen
                 curUpper = num /= 0
-                
+
             in if numUpper == 0
                 then (False, firstGen)
                 else (curUpper, secondGen)
@@ -406,7 +397,46 @@ powerInAbacus gen (numLower, numUpper) = (RowAbacus newLower newUpper, finalGen)
 --powerInAbacus (numLower, numUpper) = RowAbacus (take numLower $ repeat Done) (if numUpper == 0 then False else True)
 
 
---numInAbacus :: Int -> [RowAbacus]
+createAbacus :: [Int] -> [RowAbacus]
+createAbacus [] = []
+createAbacus (row:rows)
+    | row < 0 = error "Error ImperativeAbacus createAbacus: Получено отрицательное число разряда для абакуса"
+    | row >= 5 = RowAbacus (funcLower balanceRower) True : createAbacus rows
+    | otherwise = RowAbacus (funcLower row) False : createAbacus rows
+
+    where balanceRower = row - 5
+          funcLower l = replicate l Done
+
+
+numInAbacus :: Int -> [RowAbacus]
+numInAbacus num
+    | num >= 0 = abacus
+    | otherwise = error "Error ImperativeAbacus numInAbacus: На преобразование в абакус дано отрицательное число"
+
+    where abacus = createAbacus listNumber
+          listNumber = createRows num
+
+
+createRows :: Int -> [Int]
+createRows num
+    | num == 0 = [0]
+    | otherwise = createRows' $ accRows 1 9
+
+    where accRows :: Int -> Int -> [(Int, Int)]
+          accRows powerRowSimula numSimula
+            | num <= numSimula = [tupleRow]
+            | otherwise = tupleRow : accRows newRow newNumSimula
+
+            where tupleRow = (newRow, powerRowSimula)
+                  newRow = powerRowSimula * 10
+                  newNumSimula = exponent numSimula
+
+                  exponent sim = sim * 10 + sim
+
+          createRows' :: [(Int, Int)] -> [Int]
+          createRows' [] = []
+          createRows' ((modRow, divRow):rows)
+            = num `mod` modRow `div` divRow : createRows' rows
 
 
 abacusInNum :: [RowAbacus] -> Int
