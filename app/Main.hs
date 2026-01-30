@@ -6,6 +6,7 @@ import TypeImperativeAbacus
 import PureFunctions
 import LazyFunctions
 import ImperativeAbacus
+import AbacusAPI
 
 import System.Random ( StdGen, newStdGen )
 import Graphics.Gloss
@@ -54,12 +55,12 @@ picture (EditSettings sets :\^/ App _ _ _ indent mCarrSet) = pictures allPicturi
 
 picture (App (Expressions exprs) _ _ _ _ :\^/ Settings (StartLine start) (LengthExpr lenExpr) _ _ _)
     -- = pictures splitLinesAbacus
-    = pictures [Translate 0 0 $ pictures allPicturies]
+    = pictures [Translate (fromIntegral start) 0 $ pictures allPicturies]
 
     where compPicture = Scale 0.1 0.1 . Color black . Text
       
-          funcSplitLinesAbacus :: [Abacus] -> String
-          funcSplitLinesAbacus = {-fmap-} unwords {-. splitList lenExpr-} . exprAbacusInList
+          funcSplitLinesAbacus :: [Simula] -> String
+          funcSplitLinesAbacus = {-fmap-} unwords {-. splitList lenExpr-} . simulaInStrings
 
           funcLinesAndShow [] = []
           funcLinesAndShow ((l,s):lss) = l : s : funcLinesAndShow lss
@@ -183,22 +184,26 @@ handleKey (EventKey (SpecialKey KeyCtrlL) Down _ _) world@(EditSettings listEffS
           QuantityQuestion pureQuant = quant
 
           (abac, rep) = case theme of
-            Merely -> (curMerelyAbacus, repeatExpr)
-            Brother -> (curBrotherAbacus, repeatExprBro)
-            Friend -> (curFriendAbacus, repeatExpr)
+            Merely -> (curMerelyAbacus, repeatExpr $ ExprMerely False)
+            Brother -> (curBrotherAbacus, repeatExpr $ ExprBrother False)
+            Friend -> (curFriendAbacus, repeatExpr $ ExprFriend False)
 
-          tupleRange = (minRange range, maxRange range)
+          -- `RangeRows` вводится пользователем. `countRange` нормализует ввод:
+          -- - если это количество разрядов (например 2..3), превращает в 10..999
+          -- - если это уже числовой диапазон (например 10..999), оставляет как есть
+          tupleAmountRange = Amount (minRange range, maxRange range)
+          tupleNumRange = countRange 1 tupleAmountRange
           adjustmentLenExpr = pred pureLenExpr
           (finalExpr, finalGen) = generator rand pureQuant
 
-          generator :: StdGen -> Int -> ([[Abacus]], StdGen)
+          generator :: StdGen -> Int -> ([[Simula]], StdGen)
           generator gen 0 = ([], gen)
           generator gen n = ((Abacus baseAbacus : freeBaseAbacus) : futureGenericExpr, finalGen)
 
-                where (dirtBaseAbacus, firstGen) = lazyPowerInAbacus gen tupleRange newAbacus
-                      baseAbacus = clearVoidRows dirtBaseAbacus
+                where (baseAbacus, firstGen) = randomAbacus tupleNumRange gen Nothing
+                      --baseAbacus = clearVoidRows dirtBaseAbacus
                       (readyExpr, secondGen) = rep firstGen adjustmentLenExpr
-                      (freeBaseAbacus, thirdGen) = abac secondGen baseAbacus tupleRange readyExpr
+                      (freeBaseAbacus, thirdGen) = abac secondGen baseAbacus tupleAmountRange readyExpr
                       (futureGenericExpr, finalGen) = (generator thirdGen . pred) n
 
 

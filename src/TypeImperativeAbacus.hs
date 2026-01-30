@@ -36,7 +36,7 @@ data EditSet
     | EditRangeRows {nested :: Bool, direct :: Direct, editRange :: Either TypeTag RangeRows}
     deriving (Show, Eq)
 
-newtype Expressions = Expressions [[Abacus]] deriving (Show, Eq)
+newtype Expressions = Expressions [[Simula]] deriving (Show, Eq)
 newtype Carriage = Carriage Int deriving (Show, Eq)
 
 newtype StartLine = StartLine Int deriving (Show, Eq)

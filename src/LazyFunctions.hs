@@ -3,34 +3,19 @@ module LazyFunctions where
 import TypeAbacus
 import PureFunctions (getLast)
 
-import System.Random
+import System.Random ( StdGen, Random(randomR) )
 
 
 
-repeatExpr :: StdGen -> Int -> ([Expr], StdGen)
-repeatExpr gen len = (pureLazy, finalGen)
+repeatExpr :: ExprAbacus -> StdGen -> Int -> ([ExprAbacus], StdGen)
+repeatExpr expr gen len = (pureLazy, finalGen)
     where pureLazy = fmap fst dirtLazy
           finalGen = snd $! getLast dirtLazy
-          dirtLazy = take len $ lazyRepeatExpr gen
+          dirtLazy = take len $ lazyRepeatExpr expr gen
         
 
-lazyRepeatExpr :: StdGen -> [(Expr, StdGen)]  
-lazyRepeatExpr gen = (curOper, firstGen) : lazyRepeatExpr firstGen
+lazyRepeatExpr :: ExprAbacus -> StdGen -> [(ExprAbacus, StdGen)]  
+lazyRepeatExpr expr gen = (curOper, firstGen) : lazyRepeatExpr expr firstGen
             
     where (numOper, firstGen) = randomR ((0, 1) :: (Int, Int)) gen
-          curOper = Expr (numOper /= 0)
-
-
-repeatExprBro :: StdGen -> Int -> ([Expr], StdGen)
-repeatExprBro gen len = (pureLazy, finalGen)
-    where pureLazy = fmap fst dirtLazy
-          finalGen = snd $! getLast dirtLazy
-          dirtLazy = take len $ lazyRepeatExprBro gen
-
-        
-lazyRepeatExprBro :: StdGen -> [(Expr, StdGen)]
-lazyRepeatExprBro gen = (curOper, secondGen) : lazyRepeatExprBro firstGen
-
-    where (numOper, firstGen) = randomR ((0, 1) :: (Int, Int)) gen
-          (numPlus, secondGen) = randomR ((0, 1) :: (Int, Int)) firstGen
-          curOper = ExprBro (numOper /= 0) (numPlus /= 0)
+          curOper =  expr {operator = numOper /= 0}

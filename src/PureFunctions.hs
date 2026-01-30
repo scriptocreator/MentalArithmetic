@@ -9,6 +9,57 @@ import Data.Maybe
 
 
 
+updFstTuple2 :: (t -> a) -> (t, b) -> (a, b)
+updFstTuple2 f (a, b) = let newA = f a in (newA, b)
+
+updSndTuple2 :: (t -> b) -> (a, t) -> (a, b)
+updSndTuple2 f (a, b) = let newB = f b in (a, newB)
+
+updFstTuple3 :: (t -> a) -> (t, b, c) -> (a, b, c)
+updFstTuple3 f (a, b, c) = let newA = f a in (newA, b, c)
+
+updSndTuple3 :: (t -> b) -> (a, t, c) -> (a, b, c)
+updSndTuple3 f (a, b, c) = let newB = f b in (a, newB, c)
+
+updThrdTuple3 :: (t -> c) -> (a, b, t) -> (a, b, c)
+updThrdTuple3 f (a, b, c) = let newC = f c in (a, b, newC)
+
+
+effFromLeft :: Either a b -> a
+effFromLeft (Left e) = e
+effFromLeft _ = error "Error PureFunctions effFromLeft: Получено не Left"
+
+
+effFromRight :: Either a b -> b
+effFromRight (Right e) = e
+effFromRight _ = error "Error PureFunctions effFromRight: Получено не Right"
+
+
+updateList :: Int -> a -> [a] -> [a]
+updateList _ _ [] = error "Error PureFunctions update: Передан пустой список"
+updateList ind el l = update' l 0
+
+    where update' [] _ = error "Error PureFunctions update: Такого индекса списка не существует"
+          update' (a:as) nesInd
+            | ind == nesInd = el : as
+            | otherwise = a : update' as (succ nesInd)
+
+
+mZip3 :: [a] -> [b] -> [c] -> [(Maybe a, Maybe b, Maybe c)]
+
+mZip3 (a:as) (b:bs) (c:cs) = (return a, return b, return c) : mZip3 as bs cs
+
+mZip3 (a:as) (b:bs) _ = (return a, return b, Nothing) : mZip3 as bs []
+mZip3 (a:as) _ (c:cs) = (return a, Nothing, return c) : mZip3 as [] cs
+mZip3 _ (b:bs) (c:cs) = (Nothing, return b, return c) : mZip3 [] bs cs
+
+mZip3 (a:as) _ _ = (return a, Nothing, Nothing) : mZip3 as [] []
+mZip3 _ (b:bs) _ = (Nothing, return b, Nothing) : mZip3 [] bs []
+mZip3 _ _ (c:cs) = (Nothing, Nothing, return c) : mZip3 [] [] cs
+
+mZip3 _      _      _      = []
+
+
 getLast :: [a] -> a
 getLast [] = error "Error PureFunctions getLast: Передан пустой список"
 getLast [x] = x

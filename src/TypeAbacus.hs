@@ -19,14 +19,14 @@ data Third a b
     | ThirdRight b
     deriving (Show, Eq, Ord)
 
-data Abacus
+data Simula
     = Abacus [RowAbacus]
     | Plus
     | Minus
     | Equal
     deriving (Show, Eq)
 
-data RowAbacus = RowAbacus [Done] Bool deriving Show
+data RowAbacus = RowAbacus {lower :: [Done], upper :: Bool} deriving Show
 
 data Done = Done deriving (Show, Eq, Ord)
 
@@ -46,18 +46,25 @@ data Number a
     | NumberNegative {number :: a}
     deriving (Show, Eq, Ord)
 
-instance Eq RowAbacus where
-    RowAbacus leftLower leftUpper == RowAbacus rightLower rightUpper
-        | (leftLower == rightLower) && (leftUpper == rightUpper) = True
-        | otherwise = False
+data RandomAbacus
+    = RandomVoid
+    | RandomMinMax
+    | RandomMin
+    | RandomMax
+    | RandomNeutral
+    deriving (Show, Eq, Ord)
 
-    leftRow /= rightRow = not $ leftRow == rightRow
+newtype Min a = Min a deriving (Show, Eq)
+newtype Max a = Max a deriving (Show, Eq)
 
-
-data Expr
-    = Expr {operator :: Bool}
-    | ExprBro {operator :: Bool, ifPlus :: Bool} -- Оператор; Для условия функции
+data ExprAbacus
+    = ExprMerely {operator :: Bool}
+    | ExprBrother {operator :: Bool}
+    | ExprFriend {operator :: Bool}
     deriving (Show, Eq)
+
+newtype Amount a = Amount {amount :: a} deriving (Show, Eq)
+newtype Account a = Account {account :: a} deriving (Show, Eq)
 
 data TypeTag = Sum0
     | Sum1 | Sum2 | Sum3 | Sum4 | Sum5 | Sum6 | Sum7 | Sum8 | Sum9 | Sum10
@@ -95,6 +102,29 @@ data TypeTag = Sum0
     | TypeTag :#* TypeTag
     | TypeTag :#+ TypeTag
     deriving (Show, Eq, Ord)
+
+instance Eq RowAbacus where
+    RowAbacus leftLower leftUpper == RowAbacus rightLower rightUpper
+        | (leftLower == rightLower) && (leftUpper == rightUpper) = True
+        | otherwise = False
+
+    leftRow /= rightRow = not $ leftRow == rightRow
+
+instance Ord RowAbacus where
+    RowAbacus leftLower leftUpper > RowAbacus rightLower rightUpper
+        | leftUpper && not rightUpper = True
+        | not (leftUpper || rightUpper) || (leftUpper && rightUpper) = leftLower > rightLower
+        | otherwise = False
+    
+    RowAbacus leftLower leftUpper < RowAbacus rightLower rightUpper
+        | not leftUpper && rightUpper = True
+        | not (leftUpper || rightUpper) || (leftUpper && rightUpper) = leftLower < rightLower
+        | otherwise = False
+
+    firstRow >= secondRow = (firstRow == secondRow) || (firstRow > secondRow)
+
+    firstRow <= secondRow = (firstRow == secondRow) || (firstRow < secondRow)
+
 
 instance Num TypeTag where
     TypeInt li + TypeInt ri = TypeInt $ li + ri
@@ -212,3 +242,9 @@ isNatural _ = False
 isNegative :: Number a -> Bool
 isNegative (NumberNegative _) = True
 isNegative _ = False
+
+
+catThirds :: [Third a b] -> [Third a b]
+catThirds [] = []
+catThirds (ThirdNothing:ts) = catThirds ts
+catThirds (t:ts) = t : catThirds ts

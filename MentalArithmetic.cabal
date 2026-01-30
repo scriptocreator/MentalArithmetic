@@ -26,6 +26,7 @@ source-repository head
 library
   exposed-modules:
       Abacus
+      AbacusAPI
       ImperativeAbacus
       LazyFunctions
       PureFunctions
@@ -40,6 +41,7 @@ library
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
   build-depends:
       base >=4.7 && <5
+    , containers
     , extra
     , gloss
     , random
@@ -58,6 +60,7 @@ executable MentalArithmetic-exe
   build-depends:
       MentalArithmetic
     , base >=4.7 && <5
+    , containers
     , extra
     , gloss
     , random
@@ -77,6 +80,7 @@ test-suite MentalArithmetic-test
   build-depends:
       MentalArithmetic
     , base >=4.7 && <5
+    , containers
     , extra
     , gloss
     , random

@@ -4,7 +4,8 @@ module ImperativeAbacus where
 
 import TypeAbacus
 import TypeImperativeAbacus
-import PureFunctions ( sortTypeList, prodTypeToList, sumTypeToList, tailType, isTypeBool, funcIf, getLast )
+import PureFunctions ( funcIf, getLast, isTypeBool, sortTypeList )
+import AbacusAPI
 
 import System.Random ( StdGen, Random(randomR) )
 import System.Random.Stateful
@@ -12,23 +13,11 @@ import Data.Maybe (fromJust, isJust, isNothing)
 import Graphics.Gloss.Interface.Pure.Game
 import Data.Either ( fromLeft, fromRight )
 import Text.Printf (printf)
-import Data.List (find)
+--import Data.List (find)
+--import Data.Sequence (update)
+--import Data.Sequence.Internal (fromList)
 
 
-
-checkAbacus :: [RowAbacus] -> [RowAbacus] -> Theme -> Abacus -> Bool
-checkAbacus abacus curAbacus _ {-Merely-} oper = False
-{-
-    where curOper = case oper of
-            Minus -> let resultAbacus = abacus - curAbacus
-                in resultAbacus
-            Plus -> 
-            expr -> error $ show expr
-          abacus curAbacus
-
-checkAbacus abacus curAbacus Brother
-checkAbacus abacus curAbacus Friend
--}
 
 setToGraph :: [EditSet] -> [Graph String String]
 setToGraph [] = []
@@ -359,7 +348,7 @@ mathElemEditSet (EditTheme {}) (EditTheme {}) = True
 mathElemEditSet (EditRangeRows {}) (EditRangeRows {}) = True
 mathElemEditSet _ _ = False
 
-
+{-
 lazyPowerInAbacus :: StdGen -> (Int, Int) -> (Int, Int) -> ([RowAbacus], StdGen)
 lazyPowerInAbacus gen tupleRange power = lazyPowerInAbacus' gen 0
 
@@ -378,78 +367,12 @@ lazyPowerInAbacus gen tupleRange power = lazyPowerInAbacus' gen 0
                   nestedLazy gen =
                     let ready@(readyRow, newGen) = powerInAbacus gen power
                     in ready : nestedLazy newGen
+-}
 
 
-powerInAbacus :: StdGen -> (Int, Int) -> (RowAbacus, StdGen)
-powerInAbacus gen (numLower, numUpper) = (RowAbacus newLower newUpper, finalGen)
-
-    where (randomLower, firstGen) = randomR (0, numLower) gen
-          newLower = replicate randomLower Done
-
-          (newUpper, finalGen) =
-            let (num, secondGen) = randomR (0, numUpper) firstGen
-                curUpper = num /= 0
-
-            in if numUpper == 0
-                then (False, firstGen)
-                else (curUpper, secondGen)
-
---powerInAbacus (numLower, numUpper) = RowAbacus (take numLower $ repeat Done) (if numUpper == 0 then False else True)
-
-
-createAbacus :: [Int] -> [RowAbacus]
-createAbacus [] = []
-createAbacus (row:rows)
-    | row < 0 = error "Error ImperativeAbacus createAbacus: Получено отрицательное число разряда для абакуса"
-    | row >= 5 = RowAbacus (funcLower balanceRower) True : createAbacus rows
-    | otherwise = RowAbacus (funcLower row) False : createAbacus rows
-
-    where balanceRower = row - 5
-          funcLower l = replicate l Done
-
-
-numInAbacus :: Int -> [RowAbacus]
-numInAbacus num
-    | num >= 0 = abacus
-    | otherwise = error "Error ImperativeAbacus numInAbacus: На преобразование в абакус дано отрицательное число"
-
-    where abacus = createAbacus listNumber
-          listNumber = createRows num
-
-
-createRows :: Int -> [Int]
-createRows num
-    | num == 0 = [0]
-    | otherwise = createRows' $ accRows 1 9
-
-    where accRows :: Int -> Int -> [(Int, Int)]
-          accRows powerRowSimula numSimula
-            | num <= numSimula = [tupleRow]
-            | otherwise = tupleRow : accRows newRow newNumSimula
-
-            where tupleRow = (newRow, powerRowSimula)
-                  newRow = powerRowSimula * 10
-                  newNumSimula = exponent numSimula
-
-                  exponent sim = sim * 10 + sim
-
-          createRows' :: [(Int, Int)] -> [Int]
-          createRows' [] = []
-          createRows' ((modRow, divRow):rows)
-            = num `mod` modRow `div` divRow : createRows' rows
-
-
-abacusInNum :: [RowAbacus] -> Int
-abacusInNum abacus = internalNum $ zip (iterate (*10) 1) abacus
-
-    where internalNum [] = 0
-          internalNum ((row, RowAbacus lower upper):abacusis) = let numUpper = if upper then 5 * row else 0
-            in length lower * row + numUpper + internalNum abacusis
-
-
-exprAbacusInList :: [Abacus] -> [String]
-exprAbacusInList [] = []
-exprAbacusInList (Plus:as) = " + " : exprAbacusInList as
-exprAbacusInList (Minus:as) = " - " : exprAbacusInList as
-exprAbacusInList (Equal:as) = " = " : exprAbacusInList as
-exprAbacusInList (Abacus abacus:as) = show (abacusInNum abacus) : exprAbacusInList as
+simulaInStrings :: [Simula] -> [String]
+simulaInStrings [] = []
+simulaInStrings (Plus:as) = " + " : simulaInStrings as
+simulaInStrings (Minus:as) = " - " : simulaInStrings as
+simulaInStrings (Equal:as) = " = " : simulaInStrings as
+simulaInStrings (Abacus abacus:as) = show (abacusInNum abacus) : simulaInStrings as
