@@ -9,7 +9,7 @@ import PureFunctions
 import System.Random ( StdGen, Random(randomR) )
 import Data.Maybe (isJust, fromJust, fromMaybe, catMaybes)
 import Text.Printf (printf)
-import Data.Either (isLeft)
+import Data.Either (isLeft, isRight)
 
 infixr 6 --!
 
@@ -171,10 +171,11 @@ a --! [] = a
 
 randomAbacus :: Account (Int, Int)
              -> StdGen
-             -> Maybe (ExprAbacus, [RowAbacus])
+             -> Either NatTheme ExprAbacus
+             -> Maybe [RowAbacus]
              -> Either String ([RowAbacus], StdGen)
 
-randomAbacus (Account (minR, maxR)) gen mbMode
+randomAbacus (Account (minR, maxR)) gen powerTheme mbMode
 
     -- | isJust mbMode && numAbacus < minR && numAbacus > maxR =   
     --    error $ printf "Error AbacusAPI randomAbacus: Абакус (%d) не входит в диапазон (%d, %d)" numAbacus minR maxR
@@ -184,10 +185,10 @@ randomAbacus (Account (minR, maxR)) gen mbMode
     | otherwise = result
 
     where mode = fromJust mbMode
-          logMinus = isJust mbMode && not (operator $ fst mode)
+          logMinus = isRight powerTheme && not (operator . effFromRight $ powerTheme)
           numNewAbacus = (abacusInNum . fst . effFromRight) result
           numAbacus = abacusInNum abacus
-          (powerTheme, abacus) = fromJust mbMode
+          abacus = fromJust mbMode
         
           result = if isJust mbMode
             then randomAbacus' revInvZip invRange RandomVoid 0 firstGen
@@ -200,15 +201,18 @@ randomAbacus (Account (minR, maxR)) gen mbMode
 
           tuple a = (a, gen)
           (tuplePowersAbacus, firstGen) = case powerTheme of
-            ExprMerely oper -> tuple $ flip fmap abacus $ operPowerMerely oper
-            ExprBrother _ -> brother abacus gen
-            ExprFriend oper -> tuple $ flip fmap abacus $ operPowerFriend oper
+            Left NatMerely -> tuple []
+            Left NatBrother -> tuple []
+            Left NatFriend -> tuple []
+            Right (ExprMerely oper) -> tuple $ flip fmap abacus $ operPowerMerely oper
+            Right bro@(ExprBrother _) -> brother abacus gen bro
+            Right (ExprFriend oper) -> tuple $ flip fmap abacus $ operPowerFriend oper
 
-          brother [] gen = ([], gen)
-          brother (r:rs) gen =
-            let (power, mbCurGen) = operPowerBrother (operator powerTheme) gen r
+          brother [] gen _ = ([], gen)
+          brother (r:rs) gen bro =
+            let (power, mbCurGen) = operPowerBrother (operator bro) gen r
                 curGen = fromMaybe gen mbCurGen
-                (futurePowers, futureGen) = brother rs curGen
+                (futurePowers, futureGen) = brother rs curGen bro
             in (power : futurePowers, futureGen)
 
           (minRowsR, maxRowsR) = (numInAbacus minR, numInAbacus maxR)
@@ -247,10 +251,11 @@ randomAbacus (Account (minR, maxR)) gen mbMode
 
             | curNumMinR < minR || curNumMaxR > maxR  =
                 let errStr :: String
-                    errStr = printf "Error AbacusAPI randomAbacus' №3: Нарушена логика создания абакуса.\nminR:        %d,   maxR:     %d,   mbMode: %s,\ninvMin:      %s, invMax:  %s, randAb: %s, mbAbacPower: %s, acc: %d,\ncurSuncMinR: %s, curMaxR: %s, curRow: %d,\n\ninvZip (randomAbacus): %s."
+                    errStr = printf "Error AbacusAPI randomAbacus' №3: Нарушена логика создания абакуса.\nminR:        %d,   maxR:     %d,   powerTheme: %s,  mbMode: %s,\ninvMin:      %s, invMax:  %s, randAb: %s, mbAbacPower: %s, acc: %d,\ncurSuncMinR: %s, curMaxR: %s, curRow: %d,\n\ninvZip (randomAbacus): %s."
                         minR
                         maxR
-                        (show $ flip fmap mbMode $ updSndTuple2 abacusInNum)
+                        (show powerTheme)
+                        (show $ fmap abacusInNum mbMode)
 
                         (show $ fmap (abacusInNum . return) invSuncMinR)
                         (show $ fmap (abacusInNum . return) invMaxR)
@@ -267,14 +272,15 @@ randomAbacus (Account (minR, maxR)) gen mbMode
                 in Left errStr
 
             | logMinus && (curNumMinR > numAbacus || curNumMaxR > numAbacus) =
-                error $ printf "Error AbacusAPI randomAbacus' №1: Абакус (%d) меньше или большн новых промежуточных (curNumMinR: %d, curNumMaxR: %d):\nminR:        %d,   maxR:     %d,   mbMode: %s,\ninvMin:      %s, invMax:  %s, randAb: %s, mbAbacPower: %s, acc: %d,\ncurSuncMinR: %s, curMaxR: %s, curRow: %d,\n\ninvZip (randomAbacus): %s."
+                error $ printf "Error AbacusAPI randomAbacus' №1: Абакус (%d) меньше или большн новых промежуточных (curNumMinR: %d, curNumMaxR: %d):\nminR:        %d,   maxR:     %d,   powerTheme: %s,  mbMode: %s,\ninvMin:      %s, invMax:  %s, randAb: %s, mbAbacPower: %s, acc: %d,\ncurSuncMinR: %s, curMaxR: %s, curRow: %d,\n\ninvZip (randomAbacus): %s."
                     numAbacus
                     curNumMinR
                     curNumMaxR
 
                     minR
                     maxR
-                    (show $ flip fmap mbMode $ updSndTuple2 abacusInNum)
+                    (show powerTheme)
+                    (show $ fmap abacusInNum mbMode)
 
                     (show $ fmap (abacusInNum . return) invSuncMinR)
                     (show $ fmap (abacusInNum . return) invMaxR)
@@ -291,7 +297,7 @@ randomAbacus (Account (minR, maxR)) gen mbMode
             | otherwise = randomAbacus' newInvZs newRange newRandAb newAcc newGen
 
             where curMinRow = Min $ fromMaybe abacus0 mbMinRow
-                  curPower = fromMaybe newPower mbAbacPower
+                  curPower = fromMaybe (correctPower powerTheme) mbAbacPower
                   curMaxRow = Max $ fromJust mbMaxRow
 
                   (curRow, newGen) = powerAndScale_InAbacus curPower curMinRow curMaxRow gen
@@ -306,6 +312,14 @@ randomAbacus (Account (minR, maxR)) gen mbMode
                   newAcc = succ acc
 
                   newInvZs = fromMaybe invZs mbNewZs
+
+
+correctPower :: Either NatTheme ExprAbacus -> (Int, Int)
+correctPower (Left _) = newPower
+correctPower (Right (ExprFriend _)) = newPower
+correctPower (Right exprAb)
+    | operator exprAb = newPower
+    | otherwise = (0, 0)
 
 
 type ForF = (Maybe RowAbacus, Maybe (Int, Int), Maybe RowAbacus)

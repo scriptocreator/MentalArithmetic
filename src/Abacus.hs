@@ -116,13 +116,13 @@ newAbacusAndGen abacus expr range gen
           Account (minP, maxP) = countRange 0 range --1 range
           balanceMaxAbacP = maxP - baseAbacusNum
           rangeP = Account (minP, balanceMaxAbacP)
-          eitAbPlusGen = randomAbacus rangeP gen $ return (exprP, abacus)
+          eitAbPlusGen = randomAbacus rangeP gen (return exprP) $ return abacus
           Right (curAbacus'P, newGen'P) = eitAbPlusGen
         
           Account (minM, maxM) = countRange 0 range
           balanceMaxM = baseAbacusNum
           rangeM = Account (minM, balanceMaxM)
-          eitAbMinusGen = randomAbacus rangeM gen $ return (exprM, abacus)
+          eitAbMinusGen = randomAbacus rangeM gen (return exprM) $ return abacus
           Right (curAbacus'M, newGen'M) = eitAbMinusGen
 
 

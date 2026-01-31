@@ -63,6 +63,9 @@ data ExprAbacus
     | ExprFriend {operator :: Bool}
     deriving (Show, Eq)
 
+data Theme = ThemeVoid | Merely | Brother | Friend deriving (Show, Eq, Ord)
+data NatTheme = NatMerely | NatBrother | NatFriend deriving (Show, Eq, Ord)
+
 newtype Amount a = Amount {amount :: a} deriving (Show, Eq)
 newtype Account a = Account {account :: a} deriving (Show, Eq)
 
@@ -102,6 +105,7 @@ data TypeTag = Sum0
     | TypeTag :#* TypeTag
     | TypeTag :#+ TypeTag
     deriving (Show, Eq, Ord)
+
 
 instance Eq RowAbacus where
     RowAbacus leftLower leftUpper == RowAbacus rightLower rightUpper
@@ -248,3 +252,10 @@ catThirds :: [Third a b] -> [Third a b]
 catThirds [] = []
 catThirds (ThirdNothing:ts) = catThirds ts
 catThirds (t:ts) = t : catThirds ts
+
+
+themeToNatTheme :: Theme -> NatTheme
+themeToNatTheme ThemeVoid = error "Error TypeAbacus themeToNatTheme: Получено ThemeVoid"
+themeToNatTheme Merely = NatMerely
+themeToNatTheme Brother = NatBrother
+themeToNatTheme Friend = NatFriend

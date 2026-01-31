@@ -200,7 +200,7 @@ handleKey (EventKey (SpecialKey KeyCtrlL) Down _ _) world@(EditSettings listEffS
           generator gen 0 = ([], gen)
           generator gen n = ((Abacus baseAbacus : freeBaseAbacus) : futureGenericExpr, finalGen)
 
-                where eitAbacGen = randomAbacus tupleNumRange gen Nothing
+                where eitAbacGen = randomAbacus tupleNumRange gen (Left $ themeToNatTheme theme) Nothing
                       (baseAbacus, firstGen) = if isRight eitAbacGen
                         then effFromRight eitAbacGen
                         else error $ effFromLeft eitAbacGen
