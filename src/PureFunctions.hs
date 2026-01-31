@@ -9,11 +9,16 @@ import Data.Maybe
 
 
 
+tup3InTup2 :: (a, b, c) -> (a, b)
+tup3InTup2 (a, b, _) = (a, b)
+
+
 updFstTuple2 :: (t -> a) -> (t, b) -> (a, b)
 updFstTuple2 f (a, b) = let newA = f a in (newA, b)
 
 updSndTuple2 :: (t -> b) -> (a, t) -> (a, b)
 updSndTuple2 f (a, b) = let newB = f b in (a, newB)
+
 
 updFstTuple3 :: (t -> a) -> (t, b, c) -> (a, b, c)
 updFstTuple3 f (a, b, c) = let newA = f a in (newA, b, c)

@@ -3,7 +3,7 @@
 module Abacus where
 
 import TypeAbacus
-import PureFunctions ( funcIf, mZip3, updFstTuple3, updThrdTuple3, updSndTuple2 )
+import PureFunctions ( funcIf, mZip3, updFstTuple3, updThrdTuple3, updSndTuple2, effFromRight, tup3InTup2, effFromLeft )
 import ImperativeAbacus
 import TypeImperativeAbacus ()
 import AbacusAPI
@@ -12,6 +12,7 @@ import System.Random ( StdGen, Random(randomR) )
 import Data.Maybe (isJust, fromJust, fromMaybe, catMaybes)
 import Text.Printf (printf)
 import Data.Tuple.Extra ( fst3, snd3, thd3 )
+import Data.Either (isRight, isLeft)
 
 
 
@@ -58,23 +59,40 @@ newAbacusAndGen :: [RowAbacus]
                 -> (ExprAbacus, [RowAbacus], StdGen)
 
 newAbacusAndGen abacus expr range gen
-    | (not . operator . fst3) result && abacus < snd3 result = error $ printf
-        "Error Abacus newAbacusAndGen: Абакус состояния (%d) меньше нового (%d):\nbalanceMaxAbacP[%d, maxP[%d] - baseAbacusNum[%d]] < minP[%d]\n(baseAbacusNum[%d] - minM[%d]) < minM[%d]"
-        (abacusInNum $ clearVoidRows abacus)
-        (abacusInNum $ clearVoidRows $ snd3 result)
 
-        balanceMaxAbacP
-        maxP
-        baseAbacusNum
-        minP
+    | isLeft result || (not . operator . fst3 . effFromRight) result && abacus < (snd3 . effFromRight) result =
 
-        baseAbacusNum
-        minM
-        minM
+        let updResult :: Either String (ExprAbacus, [RowAbacus], StdGen) -> Either String (ExprAbacus, Int)
+            updResult (Left str) = Left str
+            updResult (Right tuple) = Right $ updSndTuple2 (abacusInNum . clearVoidRows) $ tup3InTup2 tuple
 
-    | otherwise = result
+            optionStr =
+                let yes = "Error Abacus newAbacusAndGen: Абакус состояния (%d) меньше нового (%s):\nbalanceMaxAbacP[%d, maxP[%d] - baseAbacusNum[%d]] < minP[%d]\n(baseAbacusNum[%d] - minM[%d]) < minM[%d]"
+                    no = "Error Abacus newAbacusAndGen: Вот абакус состояния (%d) и новый абакус (%s):\nbalanceMaxAbacP[%d, maxP[%d] - baseAbacusNum[%d]] < minP[%d]\n(baseAbacusNum[%d] - minM[%d]) < minM[%d]"
+                in if isRight result then yes else no
+
+            errStr = printf optionStr
+                (abacusInNum $ clearVoidRows abacus)
+                (show $ updResult result)
+
+                balanceMaxAbacP
+                maxP
+                baseAbacusNum
+                minP
+
+                baseAbacusNum
+                minM
+                minM
+            recurErrStr = if isLeft result
+                then errStr ++ "\n\n" ++ effFromLeft result
+                else errStr
+        
+        in error recurErrStr
+
+    | otherwise = effFromRight result
     
-    where result
+    where result :: Either String (ExprAbacus, [RowAbacus], StdGen)
+          result
             | operator expr = if balanceMaxAbacP < minP
                 then minus
                 else plus
@@ -84,20 +102,28 @@ newAbacusAndGen abacus expr range gen
         
           exprP = expr {operator = True}
           exprM = expr {operator = False}
-          plus = (exprP, curAbacus'P, newGen'P)
-          minus = (exprM, curAbacus'M, newGen'M)
+
+          plus = if isRight eitAbPlusGen
+            then return (exprP, curAbacus'P, newGen'P)
+            else Left $ effFromLeft eitAbPlusGen
+
+          minus = if isRight eitAbMinusGen
+            then return (exprM, curAbacus'M, newGen'M)
+            else Left $ effFromLeft eitAbPlusGen
         
           baseAbacusNum = abacusInNum $! abacus
           
           Account (minP, maxP) = countRange 0 range --1 range
           balanceMaxAbacP = maxP - baseAbacusNum
           rangeP = Account (minP, balanceMaxAbacP)
-          (curAbacus'P, newGen'P) = randomAbacus rangeP gen $ return (exprP, abacus)
+          eitAbPlusGen = randomAbacus rangeP gen $ return (exprP, abacus)
+          Right (curAbacus'P, newGen'P) = eitAbPlusGen
         
           Account (minM, maxM) = countRange 0 range
           balanceMaxM = baseAbacusNum
           rangeM = Account (minM, balanceMaxM)
-          (curAbacus'M, newGen'M) = randomAbacus rangeM gen $ return (exprM, abacus)
+          eitAbMinusGen = randomAbacus rangeM gen $ return (exprM, abacus)
+          Right (curAbacus'M, newGen'M) = eitAbMinusGen
 
 
 exprInSimula :: ExprAbacus -> Simula

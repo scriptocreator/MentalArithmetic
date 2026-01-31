@@ -14,7 +14,7 @@ import Graphics.Gloss.Interface.Pure.Game
 import Graphics.Gloss.Data.Color
 import Data.Maybe (fromJust, isJust, isNothing, catMaybes)
 import Data.List (find)
-import Data.Either (fromLeft)
+import Data.Either (fromLeft, fromRight, isRight, isLeft)
 import Data.Tuple.Extra ( fst3, snd3, thd3 )
 
 
@@ -200,7 +200,10 @@ handleKey (EventKey (SpecialKey KeyCtrlL) Down _ _) world@(EditSettings listEffS
           generator gen 0 = ([], gen)
           generator gen n = ((Abacus baseAbacus : freeBaseAbacus) : futureGenericExpr, finalGen)
 
-                where (baseAbacus, firstGen) = randomAbacus tupleNumRange gen Nothing
+                where eitAbacGen = randomAbacus tupleNumRange gen Nothing
+                      (baseAbacus, firstGen) = if isRight eitAbacGen
+                        then effFromRight eitAbacGen
+                        else error $ effFromLeft eitAbacGen
                       --baseAbacus = clearVoidRows dirtBaseAbacus
                       (readyExpr, secondGen) = rep firstGen adjustmentLenExpr
                       (freeBaseAbacus, thirdGen) = abac secondGen baseAbacus tupleAmountRange readyExpr
