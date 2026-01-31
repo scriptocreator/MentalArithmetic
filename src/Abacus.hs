@@ -59,9 +59,9 @@ newAbacusAndGen :: [RowAbacus]
 
 newAbacusAndGen abacus expr range gen
     | (not . operator . fst3) result && abacus < snd3 result = error $ printf
-        "Error Abacus newAbacusAndGen: Абакус состояния (%s) меньше нового (%s):\nbalanceMaxAbacP[%d, maxP[%d] - baseAbacusNum[%d]] < minP[%d]\n(baseAbacusNum[%d] - minM[%d]) < minM[%d]"
-        (show abacus)
-        (show $ snd3 result)
+        "Error Abacus newAbacusAndGen: Абакус состояния (%d) меньше нового (%d):\nbalanceMaxAbacP[%d, maxP[%d] - baseAbacusNum[%d]] < minP[%d]\n(baseAbacusNum[%d] - minM[%d]) < minM[%d]"
+        (abacusInNum $ clearVoidRows abacus)
+        (abacusInNum $ clearVoidRows $ snd3 result)
 
         balanceMaxAbacP
         maxP

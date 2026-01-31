@@ -231,7 +231,7 @@ randomAbacus (Account (minR, maxR)) gen mbMode
                 = randomAbacus' newInvZs newRange newRandAb newAcc newGen
 
             | otherwise = error $ printf
-                "Error AbacusAPI randomAbacus №3: Нарушена логика создания абакуса.\nminR:        %d,   maxR:     %d,   mbMode: %s,\ninvMin:      %s, invMax:  %s, randAb: %s, mbAbacPower: %s, acc: %d,\ncurSuncMinR: %d, curMaxR: %d, curRow: %d,\n\ninvZip (randomAbacus): %s."
+                "Error AbacusAPI randomAbacus №3: Нарушена логика создания абакуса.\nminR:        %d,   maxR:     %d,   mbMode: %s,\ninvMin:      %s, invMax:  %s, randAb: %s, mbAbacPower: %s, acc: %d,\ncurSuncMinR: %s, curMaxR: %s, curRow: %d,\n\ninvZip (randomAbacus): %s."
                 minR
                 maxR
                 (show $ flip fmap mbMode $ updSndTuple2 abacusInNum)
@@ -252,7 +252,7 @@ randomAbacus (Account (minR, maxR)) gen mbMode
                   curPower = fromMaybe newPower mbAbacPower
                   curMaxRow = Max $ fromJust mbMaxRow
 
-                  (curRow, newGen, _) = powerAndScale_InAbacus curPower curMinRow curMaxRow gen
+                  (curRow, newGen) = powerAndScale_InAbacus curPower curMinRow curMaxRow gen
 
                   cupAcc = succ acc
 
@@ -315,49 +315,49 @@ randomAbacus (Account (minR, maxR)) gen mbMode
                   newInvZs = fromMaybe invZs mbNewZs
 
 
-powerAndScale_InAbacus :: (Int, Int) -> Min RowAbacus -> Max RowAbacus -> StdGen -> (RowAbacus, StdGen, Bool)
-powerAndScale_InAbacus power@(powerLower, powerNumUpper) (Min minA) (Max maxA) gen
+{-| Протестил на:
+  | => lambda gen _ = let (ab,ng) = powerAndScale_InAbacus (4,1) (Min abacus4) (Max abacus6) gen in do {print $ rowInNum ab; return ng}
+  | => import Control.Monad
+  | => foldM_ lambda gen (replicate 5 ())
+  |-}
+powerAndScale_InAbacus :: (Int, Int) -> Min RowAbacus -> Max RowAbacus -> StdGen -> (RowAbacus, StdGen)
+powerAndScale_InAbacus power (Min minA) (Max maxA) gen
     | minA > maxA = error "Error AbacusAPI powerAndScale_InAbacus: Меньшее больше большего числа"
+    | minA > powerA = error "Error AbacusAPI powerAndScale_InAbacus: Минимальное число не входит в диапазон"
+
+    | (minA == powerA) && (powerA == maxA) = tuple powerA
     
-    | otherwise = if isJust mbCur
-        then tupleYes $ RowAbacus newLower newUpper
-        else tupleNo powerA
+    | otherwise = finalRowGen
 
-
-    where tupleYes a = (a, finalGen, isJust mbCur)
-          tupleNo a = (a, gen, isJust mbCur)
+    where tuple a = (a, gen)
           powerA = tupleInAbacus power
-          (curMin, dirtCurMax) = fromJust mbCur
-          curMax = if lower curMin > lower dirtCurMax
-            then dirtCurMax {lower = lower curMin}
-            else dirtCurMax
 
-          mbCur = case (upper minA, upper powerA, upper maxA) of
+          (logOption, optionGen) = flip randomR gen ((0, 1) :: (Int, Int))
+          groundPowerA = powerA {upper = False}
+
+          finalRowGen = case (upper minA, upper powerA, upper maxA) of
             (True, _, False) -> error "Error AbacusAPI powerAndScale_InAbacus: Минимальное число больше максимального"
-            (False, True, False) -> error "Error AbacusAPI powerAndScale_InAbacus: Потенциал выходит за пределы диапазона"
 
-            (False, True, True) ->
-                case (lower minA < lower powerA, lower maxA < lower powerA) of
-                    (True, True) -> return (powerA {lower = lower minA}, maxA)
-                    (True, False) -> return (powerA {lower = lower minA}, maxA)
-                    (False, True) -> return (minA, maxA)
-                    _ -> Nothing
-
-            (False, False, True) ->
-                case (lower minA < lower powerA, lower maxA < lower powerA) of
-                    (True, True) -> return (minA, powerA {lower = lower maxA})
-                    (True, False) -> return (minA, powerA)
-                    (False, True) -> return (powerA, powerA {lower = lower maxA})
-                    _ -> Nothing
-
-            _ -> case (lower minA < lower powerA, lower maxA < lower powerA) of
-                    (True, True) -> return (minA, maxA)
-                    (True, False) -> return (minA, powerA)
-                    (False, True) -> return (powerA, maxA)
-                    _ -> Nothing
+            (False, True, False) -> flip genRow gen $ equality $ groundPowerA
+            (False, False, True) -> flip genRow gen $ inequality_UpTo5 powerA
+            (False, True, True) -> if logOption == 1
+                then genRow inequality_UpTo10 optionGen
+                else flip genRow optionGen $ inequality_UpTo5 groundPowerA
+            _ -> flip genRow gen $ equality powerA
         
-          (curMinLower, curMinUpper) = abacusInTuple curMin
-          (curMaxLower, curMaxUpper) = abacusInTuple curMax
+          equality powerA = if lower maxA < lower powerA
+            then (minA, maxA)
+            else (minA, powerVSmax)
+
+            where powerVSmax = if upper powerA && not (upper maxA)
+                    then maxA {lower = lower powerA}
+                    else powerA
+        
+          inequality_UpTo5 powerA = (minA, powerA)
+            
+          inequality_UpTo10 = if lower maxA < lower powerA
+            then (abacus5, maxA)
+            else (abacus5, powerA)
         {-
           (option, firstGen) = flip randomR gen $ (0, 1) :: (Int, Int)
           doubles = if option == 0 then (1, 0) else (0, 1)
@@ -369,16 +369,11 @@ powerAndScale_InAbacus power@(powerLower, powerNumUpper) (Min minA) (Max maxA) g
                 _ -> doubles
             else (0, 0)
         -}
-          (randomLower, firstGen) = randomR (curMinLower, curMaxLower) gen
-          newLower = replicate randomLower Done
+          funcLower low = replicate low Done
 
-          (newUpper, finalGen) =
-            let (num, secondGen) = randomR (curMinUpper, curMaxUpper) firstGen
-                curUpper = num /= 0
-
-            in if curMinUpper == 0
-                then (False, firstGen)
-                else (curUpper, secondGen)
+          genRow (finMin, finMax) gen =
+            let (randomLower, firstGen) = randomR (length $ lower finMin, length $ lower finMax) gen
+            in (finMin {lower = funcLower randomLower}, firstGen)
 
 --powerInAbacus (numLower, numUpper) = RowAbacus (take numLower $ repeat Done) (if numUpper == 0 then False else True)
 
@@ -566,6 +561,13 @@ tupleInAbacus (lower, upper) = RowAbacus (replicate lower Done) (upper /= 0)
 
 abacusInTuple :: RowAbacus -> (Int, Int)
 abacusInTuple (RowAbacus lower upper) = (curLower, curUpper)
+
+    where curLower = length lower
+          curUpper = if upper then 1 else 0
+
+
+rowInNum :: RowAbacus -> Int
+rowInNum (RowAbacus lower upper) = curLower + 5 * curUpper
 
     where curLower = length lower
           curUpper = if upper then 1 else 0
