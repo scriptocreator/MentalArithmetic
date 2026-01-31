@@ -30,14 +30,14 @@ updThrdTuple3 :: (t -> c) -> (a, b, t) -> (a, b, c)
 updThrdTuple3 f (a, b, c) = let newC = f c in (a, b, newC)
 
 
-effFromLeft :: Either a b -> a
+effFromLeft :: Show b => Either a b -> a
 effFromLeft (Left e) = e
-effFromLeft _ = error "Error PureFunctions effFromLeft: Получено не Left"
+effFromLeft (Right r) = error $ printf "Error PureFunctions effFromLeft: Получено не Left:\n%s" (show r)
 
 
-effFromRight :: Either a b -> b
+effFromRight :: Show a => Either a b -> b
 effFromRight (Right e) = e
-effFromRight _ = error "Error PureFunctions effFromRight: Получено не Right"
+effFromRight (Left l) = error $ printf "Error PureFunctions effFromRight: Получено не Right:\n%s" (show l)
 
 
 updateList :: Int -> a -> [a] -> [a]

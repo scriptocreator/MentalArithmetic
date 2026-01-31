@@ -7,7 +7,7 @@ import TypeImperativeAbacus
 import PureFunctions
 
 import System.Random ( StdGen, Random(randomR) )
-import Data.Maybe (isJust, fromJust, fromMaybe, catMaybes)
+import Data.Maybe (isJust, isNothing, fromJust, fromMaybe, catMaybes)
 import Text.Printf (printf)
 import Data.Either (isLeft, isRight)
 
@@ -272,28 +272,53 @@ randomAbacus (Account (minR, maxR)) gen powerTheme mbMode
                 in Left errStr
 
             | logMinus && (curNumMinR > numAbacus || curNumMaxR > numAbacus) =
-                error $ printf "Error AbacusAPI randomAbacus' №1: Абакус (%d) меньше или большн новых промежуточных (curNumMinR: %d, curNumMaxR: %d):\nminR:        %d,   maxR:     %d,   powerTheme: %s,  mbMode: %s,\ninvMin:      %s, invMax:  %s, randAb: %s, mbAbacPower: %s, acc: %d,\ncurSuncMinR: %s, curMaxR: %s, curRow: %d,\n\ninvZip (randomAbacus): %s."
-                    numAbacus
-                    curNumMinR
-                    curNumMaxR
+                let errStr :: String
+                    errStr = printf "Error AbacusAPI randomAbacus' №1: Абакус (%d) меньше или больше новых промежуточных (curNumMinR: %d, curNumMaxR: %d):\nminR:        %d,   maxR:     %d,   powerTheme: %s,  mbMode: %s,\ninvMin:      %s, invMax:  %s, randAb: %s, mbAbacPower: %s, acc: %d,\ncurSuncMinR: %s, curMaxR: %s, curRow: %d,\n\ninvZip (randomAbacus): %s."
+                        numAbacus
+                        curNumMinR
+                        curNumMaxR
 
-                    minR
-                    maxR
-                    (show powerTheme)
-                    (show $ fmap abacusInNum mbMode)
+                        minR
+                        maxR
+                        (show powerTheme)
+                        (show $ fmap abacusInNum mbMode)
 
-                    (show $ fmap (abacusInNum . return) invSuncMinR)
-                    (show $ fmap (abacusInNum . return) invMaxR)
-                    (show randAb)
-                    (show mbAbacPower)
-                    acc
+                        (show $ fmap (abacusInNum . return) invSuncMinR)
+                        (show $ fmap (abacusInNum . return) invMaxR)
+                        (show randAb)
+                        (show mbAbacPower)
+                        acc
 
-                    (show $ rowInNum <$> curSuncMinR)
-                    (show $ rowInNum <$> curMaxR)
-                    (abacusInNum [curRow])
+                        (show $ rowInNum <$> curSuncMinR)
+                        (show $ rowInNum <$> curMaxR)
+                        (abacusInNum [curRow])
 
-                    (show $ if isJust mbMode then revInvZip else nullRevInvZip)
+                        (show $ if isJust mbMode then revInvZip else nullRevInvZip)
+
+                in Left errStr
+
+            | isNothing mbMaxRow =
+                let errStr :: String
+                    errStr = printf "Error AbacusAPI randomAbacus' №1: mbMaxRow равен пустоте:\nminR:        %d,   maxR:     %d,   powerTheme: %s,  mbMode: %s,\ninvMin:      %s, invMax:  %s, randAb: %s, mbAbacPower: %s, acc: %d,\ninvZip (randomAbacus): %s."
+                        numAbacus
+                        curNumMinR
+                        curNumMaxR
+
+                        minR
+                        maxR
+                        (show powerTheme)
+                        (show $ fmap abacusInNum mbMode)
+
+                        (show $ fmap (abacusInNum . return) invSuncMinR)
+                        (show $ fmap (abacusInNum . return) invMaxR)
+                        (show randAb)
+                        (show mbAbacPower)
+                        acc
+
+                        (show $ if isJust mbMode then revInvZip else nullRevInvZip)
                 
+                in Left errStr
+
             | otherwise = randomAbacus' newInvZs newRange newRandAb newAcc newGen
 
             where curMinRow = Min $ fromMaybe abacus0 mbMinRow

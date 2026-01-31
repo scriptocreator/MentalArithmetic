@@ -66,23 +66,40 @@ newAbacusAndGen abacus expr range gen
             updResult (Left str) = Left str
             updResult (Right tuple) = Right $ updSndTuple2 (abacusInNum . clearVoidRows) $ tup3InTup2 tuple
 
-            optionStr =
-                let yes = "Error Abacus newAbacusAndGen: Абакус состояния (%d) меньше нового (%s):\nbalanceMaxAbacP[%d, maxP[%d] - baseAbacusNum[%d]] < minP[%d]\n(baseAbacusNum[%d] - minM[%d]) < minM[%d]"
-                    no = "Error Abacus newAbacusAndGen: Вот абакус состояния (%d) и новый абакус (%s):\nbalanceMaxAbacP[%d, maxP[%d] - baseAbacusNum[%d]] < minP[%d]\n(baseAbacusNum[%d] - minM[%d]) < minM[%d]"
-                in if isRight result then yes else no
+            errStr :: String
+            errStr =
+                let yes :: String
+                    no :: String
+                    yes = "Error Abacus newAbacusAndGen: Абакус состояния (%d) меньше нового (%s):\nbalanceMaxAbacP[%d, maxP[%d] - baseAbacusNum[%d]] < minP[%d]\n(baseAbacusNum[%d] - minM[%d]) < minM[%d]"
+                    no = "Error Abacus newAbacusAndGen: Вот абакус состояния (%d):\nbalanceMaxAbacP[%d, maxP[%d] - baseAbacusNum[%d]] < minP[%d]\n(baseAbacusNum[%d] - minM[%d]) < minM[%d]"
+                
+                in if isRight result
 
-            errStr = printf optionStr
-                (abacusInNum $ clearVoidRows abacus)
-                (show $ updResult result)
+                then printf yes
+                    (abacusInNum $ clearVoidRows abacus)
+                    (show $ updResult result)
 
-                balanceMaxAbacP
-                maxP
-                baseAbacusNum
-                minP
+                    balanceMaxAbacP
+                    maxP
+                    baseAbacusNum
+                    minP
 
-                baseAbacusNum
-                minM
-                minM
+                    baseAbacusNum
+                    minM
+                    minM
+
+                else printf no
+                    (abacusInNum $ clearVoidRows abacus)
+
+                    balanceMaxAbacP
+                    maxP
+                    baseAbacusNum
+                    minP
+
+                    baseAbacusNum
+                    minM
+                    minM
+
             recurErrStr = if isLeft result
                 then errStr ++ "\n\n" ++ effFromLeft result
                 else errStr
@@ -96,6 +113,7 @@ newAbacusAndGen abacus expr range gen
             | operator expr = if balanceMaxAbacP < minP
                 then minus
                 else plus
+
             | otherwise = if (baseAbacusNum - minM) < minM
                 then plus
                 else minus
@@ -109,7 +127,7 @@ newAbacusAndGen abacus expr range gen
 
           minus = if isRight eitAbMinusGen
             then return (exprM, curAbacus'M, newGen'M)
-            else Left $ effFromLeft eitAbPlusGen
+            else Left $ effFromLeft eitAbMinusGen
         
           baseAbacusNum = abacusInNum $! abacus
           
