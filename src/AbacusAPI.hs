@@ -9,6 +9,7 @@ import PureFunctions
 import System.Random ( StdGen, Random(randomR) )
 import Data.Maybe (isJust, fromJust, fromMaybe, catMaybes)
 import Text.Printf (printf)
+import Data.Either (isLeft)
 
 infixr 6 --!
 
@@ -174,19 +175,28 @@ randomAbacus :: Account (Int, Int)
              -> Either String ([RowAbacus], StdGen)
 
 randomAbacus (Account (minR, maxR)) gen mbMode
-    | isJust mbMode = --if numAbacus >= minR && numAbacus <= maxR
-        randomAbacus' revInvZip invRange RandomVoid 0 firstGen
-        --error $ printf "Error AbacusAPI randomAbacus №1: Абакус (%d) не входит в диапазон (%d, %d)" numAbacus minR maxR
 
-    | otherwise = randomAbacus' nullRevInvZip invRange RandomVoid 0 gen
+    -- | isJust mbMode && numAbacus < minR && numAbacus > maxR =   
+    --    error $ printf "Error AbacusAPI randomAbacus: Абакус (%d) не входит в диапазон (%d, %d)" numAbacus minR maxR
 
-    where lenMin = length $! minRowsR
+    | isLeft result = result
+
+    | otherwise = result
+
+    where mode = fromJust mbMode
+          logMinus = isJust mbMode && not (operator $ fst mode)
+          numNewAbacus = (abacusInNum . fst . effFromRight) result
+          numAbacus = abacusInNum abacus
+          (powerTheme, abacus) = fromJust mbMode
+        
+          result = if isJust mbMode
+            then randomAbacus' revInvZip invRange RandomVoid 0 firstGen
+            else randomAbacus' nullRevInvZip invRange RandomVoid 0 gen
+        
+          lenMin = length $! minRowsR
           lenMax = length $! maxRowsR
           gapLens = lenMax - lenMin
           invRange = (Min $ replicate gapLens abacus0 ++ reverse minRowsR, Max $ reverse maxRowsR)
-
-          (powerTheme, abacus) = fromJust mbMode
-          --numAbacus = abacusInNum abacus
 
           tuple a = (a, gen)
           (tuplePowersAbacus, firstGen) = case powerTheme of
@@ -220,19 +230,24 @@ randomAbacus (Account (minR, maxR)) gen mbMode
 
 
           randomAbacus' [] (Min invSuncMinR, Max invMaxR) _ _ gen
-            | numMin == numMax = return (newAbacus, gen)
-            | otherwise = error "Error AbacusAPI randomAbacus №2: Получено два разных числа"
 
-            where numMin = abacusInNum invSuncMinR
-                  numMax = abacusInNum invMaxR
-                  newAbacus = numInAbacus numMin
+            | numMin /= numMax = Left "Error AbacusAPI randomAbacus' №2: Получено два разных числа"
+
+            | otherwise = return (newAbacus, gen)
+
+            where suncMinR = reverse invSuncMinR
+                  maxR = reverse invMaxR
+                  numMin = abacusInNum suncMinR
+                  numMax = abacusInNum maxR
+                  numNewAbacus = numMin
+                  newAbacus = suncMinR
 
 
           randomAbacus' ((mbMinRow,mbAbacPower,mbMaxRow):invZs) mainMinMax@(Min invSuncMinR, Max invMaxR) randAb acc gen
 
             | curNumMinR < minR || curNumMaxR > maxR  =
                 let errStr :: String
-                    errStr = printf "Error AbacusAPI randomAbacus №3: Нарушена логика создания абакуса.\nminR:        %d,   maxR:     %d,   mbMode: %s,\ninvMin:      %s, invMax:  %s, randAb: %s, mbAbacPower: %s, acc: %d,\ncurSuncMinR: %s, curMaxR: %s, curRow: %d,\n\ninvZip (randomAbacus): %s."
+                    errStr = printf "Error AbacusAPI randomAbacus' №3: Нарушена логика создания абакуса.\nminR:        %d,   maxR:     %d,   mbMode: %s,\ninvMin:      %s, invMax:  %s, randAb: %s, mbAbacPower: %s, acc: %d,\ncurSuncMinR: %s, curMaxR: %s, curRow: %d,\n\ninvZip (randomAbacus): %s."
                         minR
                         maxR
                         (show $ flip fmap mbMode $ updSndTuple2 abacusInNum)
@@ -251,6 +266,28 @@ randomAbacus (Account (minR, maxR)) gen mbMode
                 
                 in Left errStr
 
+            | logMinus && (curNumMinR > numAbacus || curNumMaxR > numAbacus) =
+                error $ printf "Error AbacusAPI randomAbacus' №1: Абакус (%d) меньше или большн новых промежуточных (curNumMinR: %d, curNumMaxR: %d):\nminR:        %d,   maxR:     %d,   mbMode: %s,\ninvMin:      %s, invMax:  %s, randAb: %s, mbAbacPower: %s, acc: %d,\ncurSuncMinR: %s, curMaxR: %s, curRow: %d,\n\ninvZip (randomAbacus): %s."
+                    numAbacus
+                    curNumMinR
+                    curNumMaxR
+
+                    minR
+                    maxR
+                    (show $ flip fmap mbMode $ updSndTuple2 abacusInNum)
+
+                    (show $ fmap (abacusInNum . return) invSuncMinR)
+                    (show $ fmap (abacusInNum . return) invMaxR)
+                    (show randAb)
+                    (show mbAbacPower)
+                    acc
+
+                    (show $ rowInNum <$> curSuncMinR)
+                    (show $ rowInNum <$> curMaxR)
+                    (abacusInNum [curRow])
+
+                    (show $ if isJust mbMode then revInvZip else nullRevInvZip)
+                
             | otherwise = randomAbacus' newInvZs newRange newRandAb newAcc newGen
 
             where curMinRow = Min $ fromMaybe abacus0 mbMinRow
@@ -259,7 +296,7 @@ randomAbacus (Account (minR, maxR)) gen mbMode
 
                   (curRow, newGen) = powerAndScale_InAbacus curPower curMinRow curMaxRow gen
 
-                  (mCurMin@(Min curSuncMinR), mCurMax@(Max curMaxR), newRandAb, mbNewZs) =
+                  ((mCurMin@(Min curSuncMinR), mCurMax@(Max curMaxR)), newRandAb, mbNewZs) =
                     updateCycle randAb mainMinMax curRow acc invZs
 
                   curNumMinR = abacusInNum $ reverse curSuncMinR
@@ -279,13 +316,35 @@ fResMin = updFstTuple3 (\_ -> Just abacus0)
 fResMax :: ForF -> ForF
 fResMax = updThrdTuple3 (\_ -> Just abacus9)
 
+fMin :: (t1 -> t2) -> Min t1 -> Min t2
+fMin f (Min m) = Min $ f m
 
+fMax :: (t1 -> t2) -> Max t1 -> Max t2
+fMax f (Max m) = Max $ f m
+
+
+{-| # Ошибка найдена:
+  | Числа проверяются только на равенство
+  | 
+  | Для тестов:
+  | => mainMax = (Min [abacus1, abacus0, abacus0], Max [abacus8, abacus8, abacus5])
+  | => invZs = mZip3 [abacus1, abacus0, abacus0] [(3,1), (3,1), (0,1)] [abacus8, abacus8, abacus5]
+  | => curInvZs = tail invZs
+  | => upd = updateCycle RandomVoid mainMax abacus8 0 curInvZs
+  | => newUpd = updFstTuple3 (updFstTuple2 (fMin (abacusInNum . reverse))) upd
+  | => newUpd2 = updFstTuple3 (updSndTuple2 (fMax (abacusInNum . reverse))) newUpd
+  |
+  | => forF = fromJust $ thd3 newUpd
+  | => forFFsts = fmap (rowInNum . fromJust . fst3) forF
+  | => forFThrds = fmap (rowInNum . fromJust . thd3) forF
+  | => zip forFFsts forFThrds
+  |-}
 updateCycle :: RandomAbacus
             -> (Min [RowAbacus], Max [RowAbacus])
             -> RowAbacus
             -> Int
             -> [ForF]
-            -> (Min [RowAbacus], Max [RowAbacus], RandomAbacus, Maybe [ForF])
+            -> ((Min [RowAbacus], Max [RowAbacus]), RandomAbacus, Maybe [ForF])
 
 updateCycle randAb
             (Min invSuncMinR, Max invMaxR)
@@ -296,26 +355,26 @@ updateCycle randAb
     = case randAb of
 
     RandomVoid -> case (logMin, logMax) of
-        (True, True)    ->  (min_STAND, max_STAND, RandomMinMax, upd [])
-        (True, False)   ->  (min_STAND, max_NEU, RandomMin, upd [fResMax])
-        (False, True)   ->  (min_NEU, max_STAND, RandomMax, upd [fResMin])
-        (False, False)  ->  (min_NEU, max_NEU, RandomNeutral, upd [fResMin, fResMax])
+        (True, True)    ->  ((min_STAND, max_STAND), RandomMinMax, upd [])
+        (True, False)   ->  ((min_STAND, max_NEU), RandomMin, upd [fResMax])
+        (False, True)   ->  ((min_NEU, max_STAND), RandomMax, upd [fResMin])
+        (False, False)  ->  ((min_NEU, max_NEU), RandomNeutral, upd [fResMin, fResMax])
 
     RandomMinMax -> case (logMin, logMax) of
-        (True, True)    ->  (min_STAND, max_STAND, RandomMinMax, upd [])
-        (True, False)   ->  (min_STAND, max_NEU, RandomMin, upd [fResMax])
-        (False, True)   ->  (min_NEU, max_STAND, RandomMax, upd [fResMin])
-        (False, False)  ->  (min_NEU, max_NEU, RandomNeutral, upd [fResMin, fResMax])
+        (True, True)    ->  ((min_STAND, max_STAND), RandomMinMax, upd [])
+        (True, False)   ->  ((min_STAND, max_NEU), RandomMin, upd [fResMax])
+        (False, True)   ->  ((min_NEU, max_STAND), RandomMax, upd [fResMin])
+        (False, False)  ->  ((min_NEU, max_NEU), RandomNeutral, upd [fResMin, fResMax])
 
     RandomMin -> if logMin
-        then                (min_STAND, max_NEU, RandomMin, upd [fResMax])
-        else                (min_NEU, max_NEU, RandomNeutral, upd [fResMin, fResMax])
+        then                ((min_STAND, max_NEU), RandomMin, upd [fResMax])
+        else                ((min_NEU, max_NEU), RandomNeutral, upd [fResMin, fResMax])
 
     RandomMax -> if logMax
-        then                (min_NEU, max_STAND, RandomMax, upd [fResMin])
-        else                (min_NEU, max_NEU, RandomNeutral, upd [fResMin, fResMax])
+        then                ((min_NEU, max_STAND), RandomMax, upd [fResMin])
+        else                ((min_NEU, max_NEU), RandomNeutral, upd [fResMin, fResMax])
 
-    RandomNeutral       ->  (min_NEU, max_NEU, RandomNeutral, upd [fResMin, fResMax])
+    RandomNeutral       ->  ((min_NEU, max_NEU), RandomNeutral, upd [fResMin, fResMax])
 
     where cupAcc = succ acc
 
@@ -325,14 +384,14 @@ updateCycle randAb
           min_STAND = Min invSuncMinR
           max_STAND = Max invMaxR
 
-          min_NEU = func_NEU Min invSuncMinR
-          max_NEU = func_NEU Max invMaxR
+          min_NEU = func_NEU Min invSuncMinR abacus0
+          max_NEU = func_NEU Max invMaxR abacus9
 
-          func_NEU returnNum invL =
+          func_NEU returnNum invL curAbacus =
             let headScale = flip take invL $ pred cupAcc
                 tailInv = drop cupAcc invL
 
-            in returnNum $ headScale ++ return curRow ++ replicate (length tailInv) abacus9
+            in returnNum $ headScale ++ return curRow ++ replicate (length tailInv) curAbacus
 
 
           upd :: [ForF -> ForF] -> Maybe [ForF]
